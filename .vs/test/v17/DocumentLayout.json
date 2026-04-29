@@ -1,0 +1,37 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\LENOVO\\Desktop\\c-homework\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{F8AD7601-B562-4557-8242-404C23A2ACC1}|test.vcxproj|C:\\Users\\LENOVO\\Desktop\\c-homework\\4.0.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{F8AD7601-B562-4557-8242-404C23A2ACC1}|test.vcxproj|solutionrelative:4.0.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "4.0.cpp",
+              "DocumentMoniker": "C:\\Users\\LENOVO\\Desktop\\c-homework\\4.0.cpp",
+              "RelativeDocumentMoniker": "4.0.cpp",
+              "ToolTip": "C:\\Users\\LENOVO\\Desktop\\c-homework\\4.0.cpp",
+              "RelativeToolTip": "4.0.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAbAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2026-04-29T09:14:03.52Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
