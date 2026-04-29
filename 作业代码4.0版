@@ -1,0 +1,1435 @@
+#include <graphics.h>
+#include <conio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <string>
+#include <list>
+
+// ========== 核心修复：SDL3_mixer 宏定义 + 命名适配 ==========
+// 强制开启SDL3_mixer的所有功能宏
+#define SDL_MIXER_MAJOR_VERSION 3
+#define SDL_MIXER_MINOR_VERSION 0
+#define SDL_MIXER_PATCHLEVEL 0
+#define MIX_MP3 1
+// SDL3 核心头文件
+#include <SDL3/SDL.h>
+// 直接引入SDL_mixer.h（已放项目目录）
+#include <SDL3_mixer/SDL_mixer.h>
+
+// ==================== 常量定义 ====================
+const int WIDTH = 1200;
+const int HEIGHT = 800;
+const int PLAYER_SIZE = 45;
+const int POWERUP_SIZE = 30;
+const int TOTEM_SIZE = 60;
+const int TIME_SLOW_DURATION = 5000;   // 图腾改为降速（非时停）
+const int SHOCKWAVE_RADIUS = 250;     // 冲击波范围扩大（原150→250）
+const int SHOCKWAVE_INTERVAL = 1670;
+const int PLAYER_COLOR_DURATION = 5000;
+const float TIME_SLOW_FACTOR = 0.5f;   // 图腾降速系数（50%）
+
+// 移动速度
+const int MOVE_SPEED = 20;
+const int RISE_SPEED = 20;
+const int FALL_SPEED = 20;
+
+// 关卡参数（核心调整：第三关速度下调，4/5关保持）
+const int LEVEL3_SPEED = 20;          // 第三关速度（原30→25，介于第二关22和第四关25之间）
+const int LEVEL4_SPEED = 28;          // 第四关速度（保持）
+const int LEVEL4_MAX_OBSTACLES = 80;
+const int LEVEL4_SPAWN_RATE = 7;
+const int LEVEL5_SPEED = 30;          // 第五关速度（保持）
+const int LEVEL5_MAX_OBSTACLES = 120;
+const int LEVEL5_SPAWN_RATE = 3;
+const int TOTEM_SPAWN_HEALTH_THRESHOLD = 70;
+
+// 道具类型
+enum PowerUpType {
+    POWERUP_NONE,
+    POWERUP_SHIELD,
+    POWERUP_HEALTH,
+    POWERUP_TOTEM
+};
+
+// 菜单按键类型
+enum ButtonType {
+    BTN_LEVELS,
+    BTN_EXIT,
+    BTN_LEVEL_1,
+    BTN_LEVEL_2,
+    BTN_LEVEL_3,
+    BTN_LEVEL_4,
+    BTN_LEVEL_5,
+    BTN_CONTINUE,
+    BTN_BACK,
+    BTN_NEXT,
+    BTN_RESTART
+};
+
+// ==================== 结构体定义 ====================
+struct Player {
+    int x, y;
+    int health;
+    bool hasShield;
+    int shieldTimer;
+    bool isMovingUp;
+    bool isMovingDown;
+    bool isMovingLeft;
+    bool isMovingRight;
+    // 图腾改为降速（非时停）
+    bool isTimeSlowed;                 // 替换isTimeStopped为降速标记
+    DWORD timeSlowStart;               // 降速开始时间
+    int shockwaveCount;
+    // 玩家彩色相关
+    bool isColorful;
+    DWORD colorStart;
+};
+
+struct Obstacle {
+    int x, y;
+    int speed;
+    int size;
+    bool active;
+    int originalSpeed;                // 记录原始速度（用于降速恢复）
+};
+
+struct PowerUp {
+    int x, y;
+    int speed;
+    PowerUpType type;
+    bool active;
+};
+
+// 冲击波特效结构体
+struct Shockwave {
+    int x, y;
+    int radius;
+    int maxRadius;
+    int alpha;
+    bool active;
+};
+
+struct LevelConfig {
+    int baseSpeed;
+    int maxObstacles;
+    int spawnRate;
+    int obstacleSize;
+    bool allowPowerUps;
+    int powerUpChance;
+    int totemChance;
+};
+
+// 按键结构体
+struct Button {
+    ButtonType type;
+    int x, y, w, h;
+    const wchar_t* text;
+    bool hover;
+};
+
+// ==================== SDL3音频全局变量（核心修复：适配SDL3_mixer命名） ====================
+// 兼容SDL3_mixer的新旧命名：优先用SDL_MixMusic/SDL_MixChunk， fallback到Mix_Music/Mix_Chunk
+#ifdef SDL_MixMusic
+SDL_MixMusic* gMenuBgMusic = nullptr;      // 菜单背景音乐
+SDL_MixMusic* gLevelBgMusic[5] = { nullptr };// 5个关卡背景音乐
+SDL_MixMusic* gLevelWinMusic = nullptr;   // 1-4关胜利音乐
+SDL_MixMusic* gGameWinMusic = nullptr;    // 第五关胜利音乐
+SDL_MixMusic* gPlayerDeathMusic = nullptr;// 玩家死亡音乐
+SDL_MixChunk* gClickSound = nullptr;      // 按键点击音效
+SDL_MixChunk* gPickHealth = nullptr;      // 拾取血包音效
+SDL_MixChunk* gPickShield = nullptr;      // 拾取护盾音效
+SDL_MixChunk* gPickTotem = nullptr;       // 拾取图腾音效
+SDL_MixChunk* gPlayerHurt = nullptr;      // 玩家受击音效
+#else
+MIX_Audio* gMenuBgMusic = nullptr;      // 菜单背景音乐
+MIX_Audio* gLevelBgMusic[5] = { nullptr };// 5个关卡背景音乐
+MIX_Audio* gLevelWinMusic = nullptr;   // 1-4关胜利音乐
+MIX_Audio* gGameWinMusic = nullptr;    // 第五关胜利音乐
+MIX_Audio* gPlayerDeathMusic = nullptr;// 玩家死亡音乐
+MIX_Audio* gClickSound = nullptr;      // 按键点击音效
+MIX_Audio* gPickHealth = nullptr;      // 拾取血包音效
+MIX_Audio* gPickShield = nullptr;      // 拾取护盾音效
+MIX_Audio* gPickTotem = nullptr;       // 拾取图腾音效
+MIX_Audio* gPlayerHurt = nullptr;      // 玩家受击音效
+#endif
+
+// ==================== 全局变量 ====================
+LevelConfig levels[5] = {
+    {15, 30, 8, 35, false, 0, 0},
+    {22, 45, 6, 32, false, 0, 0},
+    {LEVEL3_SPEED, 60, 4, 30, true, 8, 0},  // 第三关速度下调为25
+    {LEVEL4_SPEED, LEVEL4_MAX_OBSTACLES, LEVEL4_SPAWN_RATE, 28, true, 12, 0},
+    {LEVEL5_SPEED, LEVEL5_MAX_OBSTACLES, LEVEL5_SPAWN_RATE, 25, true, 15, 8}
+};
+
+const wchar_t* levelDescriptions[5] = {
+    L"第一关",
+    L"第二关",
+    L"第三关",
+    L"第四关",
+    L"第五关（终极挑战）"
+};
+
+bool isPaused = false;
+std::list<Shockwave> shockwaves;
+enum MenuState {
+    MENU_MAIN,
+    MENU_LEVEL_SELECT,
+    MENU_GAME,
+    MENU_PAUSE,
+    MENU_LEVEL_COMPLETE,
+    MENU_GAME_OVER,
+    MENU_GAME_COMPLETE
+};
+MenuState currentMenu = MENU_MAIN;
+int currentLevel = 1;
+bool isTotemActive = false;
+
+// ==================== 函数声明 ====================
+Player initPlayer();
+Obstacle createObstacle(int baseSpeed, int size);
+PowerUp createPowerUp(int baseSpeed, PowerUpType type, int playerHealth);
+void drawGame(Player& p, std::list<Obstacle>& obstacles,
+    std::list<PowerUp>& powerUps, int level,
+    int timeLeft, int frameCount, LevelConfig& cfg);
+void showLevelStart(int level);
+void triggerShockwave(Player& p, std::list<Obstacle>& obstacles);
+void drawShockwaveEffect();
+void updateShockwaveEffect();
+void drawButton(Button& btn);
+bool checkButtonClick(Button& btn, MOUSEMSG& msg);
+void drawMainMenu();
+void drawLevelSelectMenu();
+void drawPauseMenu();
+void drawLevelCompleteMenu(int level);
+void drawGameOverMenu(int level);
+void drawGameCompleteMenu();
+void applyTimeSlow(std::list<Obstacle>& obstacles, bool enable); // 新增降速函数
+
+// SDL3音频相关函数声明（核心修改）
+bool initSDL3Audio();                  // 初始化SDL3音频
+void loadAudioResources();            // 加载所有音频资源
+void playMenuBgMusic();               // 播放菜单背景音乐
+void playLevelBgMusic(int level);     // 播放指定关卡背景音乐
+void stopAllBgMusic();                // 停止所有背景音乐
+void playClickSound();                // 播放按键点击音效
+void playPickHealthSound();           // 播放拾取血包音效
+void playPickShieldSound();           // 播放拾取护盾音效
+void playPickTotemSound();            // 播放拾取图腾音效
+void playLevelWinMusic();             // 播放1-4关胜利音乐
+void playGameWinMusic();              // 播放第五关胜利音乐
+void playPlayerHurtSound();           // 播放玩家受击音效
+void playPlayerDeathMusic();          // 播放玩家死亡音乐
+void cleanSDL3Audio();                // 清理SDL3音频资源
+
+// ==================== SDL3音频函数实现（核心修复：适配SDL3_mixer函数命名） ====================
+bool initSDL3Audio() {
+    // SDL3 初始化音频子系统（替代SDL2的SDL_Init(SDL_INIT_AUDIO)）
+    if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
+        printf("SDL3音频子系统初始化失败: %s\n", SDL_GetError());
+        return false;
+    }
+
+    // SDL3_mixer 初始化（兼容新旧接口）
+#ifdef Mix_Init
+    if (Mix_Init(MIX_INIT_MP3) == 0) { // 仅初始化MP3支持（如需OGG加MIX_INIT_OGG）
+        printf("Mix_Init失败: %s\n", Mix_GetError());
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        return false;
+    }
+#elif defined(SDL_Mix_Init)
+    if (SDL_Mix_Init(MIX_INIT_MP3) == 0) {
+        printf("SDL_Mix_Init失败: %s\n", SDL_Mix_GetError());
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        return false;
+    }
+#endif
+
+    // SDL3 打开音频设备（兼容新旧接口）
+#ifdef Mix_OpenAudioDevice
+    if (Mix_OpenAudioDevice(44100, MIX_DEFAULT_FORMAT, 2, 4096, nullptr, SDL_AUDIO_ALLOW_ANY_CHANGE) == -1) {
+        printf("打开音频设备失败: %s\n", Mix_GetError());
+#ifdef Mix_Quit
+        Mix_Quit();
+#else
+        SDL_Mix_Quit();
+#endif
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        return false;
+    }
+#elif defined(SDL_Mix_OpenAudioDevice)
+    if (SDL_Mix_OpenAudioDevice(44100, SDL_MIX_DEFAULT_FORMAT, 2, 4096, nullptr, SDL_AUDIO_ALLOW_ANY_CHANGE) == -1) {
+        printf("打开音频设备失败: %s\n", SDL_Mix_GetError());
+        SDL_Mix_Quit();
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        return false;
+    }
+#endif
+
+    // SDL3 预分配音频声道（兼容新旧接口）
+#ifdef Mix_AllocateChannels
+    Mix_AllocateChannels(16); // 分配16个声道足够使用
+#elif defined(SDL_Mix_AllocateChannels)
+    SDL_Mix_AllocateChannels(16);
+#endif
+
+    // 设置音量（兼容新旧接口）
+#ifdef Mix_VolumeMusic
+    Mix_VolumeMusic(80);  // 背景音乐音量
+    Mix_Volume(-1, 100);  // 所有音效音量
+#elif defined(SDL_Mix_VolumeMusic)
+    SDL_Mix_VolumeMusic(80);
+    SDL_Mix_Volume(-1, 100);
+#endif
+    return true;
+}
+
+void loadAudioResources() {
+    // 加载菜单背景音乐（兼容SDL3_mixer新旧接口）
+#ifdef Mix_LoadMUS
+    gMenuBgMusic = Mix_LoadMUS("audio/menu_bg.mp3");
+    // 加载关卡背景音乐
+    gLevelBgMusic[0] = Mix_LoadMUS("audio/level1_bg.mp3");
+    gLevelBgMusic[1] = Mix_LoadMUS("audio/level2_bg.mp3");
+    gLevelBgMusic[2] = Mix_LoadMUS("audio/level3_bg.mp3");
+    gLevelBgMusic[3] = Mix_LoadMUS("audio/level4_bg.mp3");
+    gLevelBgMusic[4] = Mix_LoadMUS("audio/level5_bg.mp3");
+    // 加载胜利/死亡音乐
+    gLevelWinMusic = Mix_LoadMUS("audio/level_win.mp3");
+    gGameWinMusic = Mix_LoadMUS("audio/game_win.mp3");
+    gPlayerDeathMusic = Mix_LoadMUS("audio/player_death.mp3");
+
+    // 加载音效
+    gClickSound = Mix_LoadWAV("audio/click.wav");
+    gPickHealth = Mix_LoadWAV("audio/pick_health.wav");
+    gPickShield = Mix_LoadWAV("audio/pick_shield.wav");
+    gPickTotem = Mix_LoadWAV("audio/pick_totem.wav");
+    gPlayerHurt = Mix_LoadWAV("audio/player_hurt.wav");
+#elif defined(SDL_Mix_LoadMUS)
+    gMenuBgMusic = SDL_Mix_LoadMUS("audio/menu_bg.mp3");
+    gLevelBgMusic[0] = SDL_Mix_LoadMUS("audio/level1_bg.mp3");
+    gLevelBgMusic[1] = SDL_Mix_LoadMUS("audio/level2_bg.mp3");
+    gLevelBgMusic[2] = SDL_Mix_LoadMUS("audio/level3_bg.mp3");
+    gLevelBgMusic[3] = SDL_Mix_LoadMUS("audio/level4_bg.mp3");
+    gLevelBgMusic[4] = SDL_Mix_LoadMUS("audio/level5_bg.mp3");
+    gLevelWinMusic = SDL_Mix_LoadMUS("audio/level_win.mp3");
+    gGameWinMusic = SDL_Mix_LoadMUS("audio/game_win.mp3");
+    gPlayerDeathMusic = SDL_Mix_LoadMUS("audio/player_death.mp3");
+
+    gClickSound = SDL_Mix_LoadWAV("audio/click.wav");
+    gPickHealth = SDL_Mix_LoadWAV("audio/pick_health.wav");
+    gPickShield = SDL_Mix_LoadWAV("audio/pick_shield.wav");
+    gPickTotem = SDL_Mix_LoadWAV("audio/pick_totem.wav");
+    gPlayerHurt = SDL_Mix_LoadWAV("audio/player_hurt.wav");
+#endif
+}
+
+void playMenuBgMusic() {
+    stopAllBgMusic();
+#ifdef Mix_PlayMusic
+    if (gMenuBgMusic) {
+        Mix_PlayMusic(gMenuBgMusic, -1); // -1表示无限循环（SDL3保留该接口）
+    }
+#elif defined(SDL_Mix_PlayMusic)
+    if (gMenuBgMusic) {
+        SDL_Mix_PlayMusic(gMenuBgMusic, -1);
+    }
+#endif
+}
+
+void playLevelBgMusic(int level) {
+    stopAllBgMusic();
+    if (level >= 1 && level <= 5 && gLevelBgMusic[level - 1]) {
+#ifdef Mix_PlayMusic
+        Mix_PlayMusic(gLevelBgMusic[level - 1], -1);
+#elif defined(SDL_Mix_PlayMusic)
+        SDL_Mix_PlayMusic(gLevelBgMusic[level - 1], -1);
+#endif
+    }
+}
+
+void stopAllBgMusic() {
+#ifdef Mix_PlayingMusic
+    if (Mix_PlayingMusic()) {
+        Mix_HaltMusic();
+    }
+#elif defined(SDL_Mix_PlayingMusic)
+    if (SDL_Mix_PlayingMusic()) {
+        SDL_Mix_HaltMusic();
+    }
+#endif
+}
+
+void playClickSound() {
+#ifdef Mix_PlayChannel
+    if (gClickSound) {
+        Mix_PlayChannel(-1, gClickSound, 0); // -1使用空闲声道，0不循环
+    }
+#elif defined(SDL_Mix_PlayChannel)
+    if (gClickSound) {
+        SDL_Mix_PlayChannel(-1, gClickSound, 0);
+    }
+#endif
+}
+
+void playPickHealthSound() {
+#ifdef Mix_PlayChannel
+    if (gPickHealth) {
+        Mix_PlayChannel(-1, gPickHealth, 0);
+    }
+#elif defined(SDL_Mix_PlayChannel)
+    if (gPickHealth) {
+        SDL_Mix_PlayChannel(-1, gPickHealth, 0);
+    }
+#endif
+}
+
+void playPickShieldSound() {
+#ifdef Mix_PlayChannel
+    if (gPickShield) {
+        Mix_PlayChannel(-1, gPickShield, 0);
+    }
+#elif defined(SDL_Mix_PlayChannel)
+    if (gPickShield) {
+        SDL_Mix_PlayChannel(-1, gPickShield, 0);
+    }
+#endif
+}
+
+void playPickTotemSound() {
+#ifdef Mix_PlayChannel
+    if (gPickTotem) {
+        Mix_PlayChannel(-1, gPickTotem, 0);
+    }
+#elif defined(SDL_Mix_PlayChannel)
+    if (gPickTotem) {
+        SDL_Mix_PlayChannel(-1, gPickTotem, 0);
+    }
+#endif
+}
+
+void playLevelWinMusic() {
+    stopAllBgMusic();
+#ifdef Mix_PlayMusic
+    if (gLevelWinMusic) {
+        Mix_PlayMusic(gLevelWinMusic, 0); // 播放一次
+    }
+#elif defined(SDL_Mix_PlayMusic)
+    if (gLevelWinMusic) {
+        SDL_Mix_PlayMusic(gLevelWinMusic, 0);
+    }
+#endif
+}
+
+void playGameWinMusic() {
+    stopAllBgMusic();
+#ifdef Mix_PlayMusic
+    if (gGameWinMusic) {
+        Mix_PlayMusic(gGameWinMusic, 0);
+    }
+#elif defined(SDL_Mix_PlayMusic)
+    if (gGameWinMusic) {
+        SDL_Mix_PlayMusic(gGameWinMusic, 0);
+    }
+#endif
+}
+
+void playPlayerHurtSound() {
+#ifdef Mix_PlayChannel
+    if (gPlayerHurt) {
+        Mix_PlayChannel(-1, gPlayerHurt, 0);
+    }
+#elif defined(SDL_Mix_PlayChannel)
+    if (gPlayerHurt) {
+        SDL_Mix_PlayChannel(-1, gPlayerHurt, 0);
+    }
+#endif
+}
+
+void playPlayerDeathMusic() {
+    stopAllBgMusic();
+#ifdef Mix_PlayMusic
+    if (gPlayerDeathMusic) {
+        Mix_PlayMusic(gPlayerDeathMusic, 0);
+    }
+#elif defined(SDL_Mix_PlayMusic)
+    if (gPlayerDeathMusic) {
+        SDL_Mix_PlayMusic(gPlayerDeathMusic, 0);
+    }
+#endif
+}
+
+void cleanSDL3Audio() {
+    // 释放背景音乐（兼容新旧接口）
+#ifdef Mix_FreeMusic
+    Mix_FreeMusic(gMenuBgMusic);
+    for (int i = 0; i < 5; i++) {
+        Mix_FreeMusic(gLevelBgMusic[i]);
+    }
+    Mix_FreeMusic(gLevelWinMusic);
+    Mix_FreeMusic(gGameWinMusic);
+    Mix_FreeMusic(gPlayerDeathMusic);
+
+    // 释放音效
+    Mix_FreeChunk(gClickSound);
+    Mix_FreeChunk(gPickHealth);
+    Mix_FreeChunk(gPickShield);
+    Mix_FreeChunk(gPickTotem);
+    Mix_FreeChunk(gPlayerHurt);
+
+    // SDL3 清理（核心修改：替代SDL2的Mix_CloseAudio/SDL_Quit）
+    Mix_CloseAudioDevice();
+    Mix_Quit();
+#elif defined(SDL_Mix_FreeMusic)
+    SDL_Mix_FreeMusic(gMenuBgMusic);
+    for (int i = 0; i < 5; i++) {
+        SDL_Mix_FreeMusic(gLevelBgMusic[i]);
+    }
+    SDL_Mix_FreeMusic(gLevelWinMusic);
+    SDL_Mix_FreeMusic(gGameWinMusic);
+    SDL_Mix_FreeMusic(gPlayerDeathMusic);
+
+    SDL_Mix_FreeChunk(gClickSound);
+    SDL_Mix_FreeChunk(gPickHealth);
+    SDL_Mix_FreeChunk(gPickShield);
+    SDL_Mix_FreeChunk(gPickTotem);
+    SDL_Mix_FreeChunk(gPlayerHurt);
+
+    SDL_Mix_CloseAudioDevice();
+    SDL_Mix_Quit();
+#endif
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+}
+
+// ==================== 原有函数实现（无修改） ====================
+Player initPlayer() {
+    Player p;
+    p.x = WIDTH / 2 - PLAYER_SIZE / 2;
+    p.y = HEIGHT - PLAYER_SIZE - 20;
+    p.health = 100;
+    p.hasShield = false;
+    p.shieldTimer = 0;
+    p.isMovingUp = false;
+    p.isMovingDown = false;
+    p.isMovingLeft = false;
+    p.isMovingRight = false;
+    p.isTimeSlowed = false;
+    p.timeSlowStart = 0;
+    p.shockwaveCount = 0;
+    p.isColorful = false;
+    p.colorStart = 0;
+    return p;
+}
+
+Obstacle createObstacle(int baseSpeed, int size) {
+    Obstacle o;
+    o.x = rand() % (WIDTH - size);
+    o.y = -size - rand() % 200;
+    o.speed = baseSpeed + rand() % 3;
+    o.originalSpeed = o.speed;
+    o.size = size;
+    o.active = true;
+    return o;
+}
+
+PowerUp createPowerUp(int baseSpeed, PowerUpType type, int playerHealth) {
+    PowerUp p;
+    int puSize = (type == POWERUP_TOTEM ? TOTEM_SIZE : POWERUP_SIZE);
+    int x = rand() % (WIDTH - puSize);
+    p.x = x;
+    p.y = -puSize - rand() % 200;
+    int speedOffset = (type == POWERUP_TOTEM ? 12 : 8);
+    p.speed = baseSpeed - speedOffset;
+    if (p.speed < 2) p.speed = 2;
+    p.type = type;
+    p.active = true;
+    if (type == POWERUP_TOTEM) {
+        isTotemActive = true;
+    }
+    return p;
+}
+
+void drawShockwaveEffect() {
+    for (auto& sw : shockwaves) {
+        if (!sw.active) continue;
+        int r = 255, g = 200, b = 0;
+        int alpha = sw.alpha;
+        COLORREF waveColor = RGB(r * alpha / 255, g * alpha / 255, b * alpha / 255);
+        setlinecolor(waveColor);
+        for (int i = 0; i < 3; i++) {
+            circle(sw.x, sw.y, sw.radius - i * 5);
+        }
+    }
+}
+
+void updateShockwaveEffect() {
+    for (auto it = shockwaves.begin(); it != shockwaves.end();) {
+        if (!it->active) {
+            it = shockwaves.erase(it);
+            continue;
+        }
+        it->radius += 8;
+        it->alpha -= 8;
+        if (it->radius > it->maxRadius || it->alpha <= 0) {
+            it->active = false;
+        }
+        ++it;
+    }
+}
+
+void triggerShockwave(Player& p, std::list<Obstacle>& obstacles) {
+    int playerCenterX = p.x + PLAYER_SIZE / 2;
+    int playerCenterY = p.y + PLAYER_SIZE / 2;
+
+    Shockwave sw;
+    sw.x = playerCenterX;
+    sw.y = playerCenterY;
+    sw.radius = 30;
+    sw.maxRadius = SHOCKWAVE_RADIUS;
+    sw.alpha = 255;
+    sw.active = true;
+    shockwaves.push_back(sw);
+
+    for (auto it = obstacles.begin(); it != obstacles.end();) {
+        if (!it->active) {
+            it = obstacles.erase(it);
+            continue;
+        }
+
+        int obsCenterX = it->x + it->size / 2;
+        int obsCenterY = it->y + it->size / 2;
+        int dx = abs(obsCenterX - playerCenterX);
+        int dy = abs(obsCenterY - playerCenterY);
+
+        if (dx + dy < SHOCKWAVE_RADIUS) {
+            it->active = false;
+        }
+        ++it;
+    }
+}
+
+void applyTimeSlow(std::list<Obstacle>& obstacles, bool enable) {
+    for (auto& obs : obstacles) {
+        if (enable) {
+            obs.speed = (int)(obs.originalSpeed * TIME_SLOW_FACTOR);
+        }
+        else {
+            obs.speed = obs.originalSpeed;
+        }
+    }
+}
+
+void drawGame(Player& p, std::list<Obstacle>& obstacles,
+    std::list<PowerUp>& powerUps, int level,
+    int timeLeft, int frameCount, LevelConfig& cfg) {
+    cleardevice();
+
+    setlinecolor(RGB(30, 30, 30));
+    for (int i = 0; i < WIDTH; i += 50) {
+        line(i, 0, i, HEIGHT);
+    }
+    for (int i = 0; i < HEIGHT; i += 50) {
+        line(0, i, WIDTH, i);
+    }
+
+    for (auto& obs : obstacles) {
+        if (!obs.active) continue;
+
+        int red = 150 + (obs.speed * 5);
+        if (red > 255) red = 255;
+
+        if (p.isTimeSlowed) {
+            setfillcolor(RGB(red / 1.5, 80 / 1.5, 80 / 1.5));
+        }
+        else {
+            setfillcolor(RGB(red, 80, 80));
+        }
+        solidrectangle(obs.x, obs.y, obs.x + obs.size, obs.y + obs.size);
+
+        setlinecolor(RGB(255, 100, 100));
+        line(obs.x, obs.y, obs.x + obs.size, obs.y + obs.size);
+        line(obs.x + obs.size, obs.y, obs.x, obs.y + obs.size);
+    }
+
+    for (auto& pu : powerUps) {
+        if (!pu.active) continue;
+
+        if (pu.type == POWERUP_SHIELD) {
+            setfillcolor(BLUE);
+            solidcircle(pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2, POWERUP_SIZE / 2);
+            setlinecolor(WHITE);
+            circle(pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2, POWERUP_SIZE / 3);
+        }
+        else if (pu.type == POWERUP_HEALTH) {
+            setfillcolor(GREEN);
+            solidcircle(pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2, POWERUP_SIZE / 2);
+            setlinecolor(WHITE);
+            line(pu.x + POWERUP_SIZE / 2 - 8, pu.y + POWERUP_SIZE / 2,
+                pu.x + POWERUP_SIZE / 2 + 8, pu.y + POWERUP_SIZE / 2);
+            line(pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2 - 8,
+                pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2 + 8);
+        }
+        else if (pu.type == POWERUP_TOTEM) {
+            setfillcolor(RGB(255, 200, 0));
+            solidcircle(pu.x + TOTEM_SIZE / 2, pu.y + TOTEM_SIZE / 2, TOTEM_SIZE / 2);
+            setlinecolor(RGB(255, 150, 0));
+            circle(pu.x + TOTEM_SIZE / 2, pu.y + TOTEM_SIZE / 2, TOTEM_SIZE / 2 - 3);
+            line(pu.x + TOTEM_SIZE / 2 - 6, pu.y + TOTEM_SIZE / 2,
+                pu.x + TOTEM_SIZE / 2 + 6, pu.y + TOTEM_SIZE / 2);
+            line(pu.x + TOTEM_SIZE / 2, pu.y + TOTEM_SIZE / 2 - 6,
+                pu.x + TOTEM_SIZE / 2, pu.y + TOTEM_SIZE / 2 + 6);
+        }
+    }
+
+    if (p.hasShield) {
+        setlinecolor(BLUE);
+        for (int i = 0; i < 3; i++) {
+            circle(p.x + PLAYER_SIZE / 2, p.y + PLAYER_SIZE / 2,
+                PLAYER_SIZE / 2 + 5 + i * 3);
+        }
+    }
+
+    if (p.isTimeSlowed) {
+        setlinecolor(RGB(255, 200, 0));
+        circle(p.x + PLAYER_SIZE / 2, p.y + PLAYER_SIZE / 2, PLAYER_SIZE / 2 + 8);
+        settextstyle(20, 0, L"微软雅黑");
+        outtextxy(p.x + PLAYER_SIZE / 2 - 15, p.y + PLAYER_SIZE / 2 - 10, L"减速");
+    }
+
+    if (p.isColorful) {
+        DWORD currentTime = GetTickCount();
+        int colorStep = (currentTime - p.colorStart) / 100 % 6;
+        COLORREF playerColor;
+        switch (colorStep) {
+        case 0: playerColor = RED; break;
+        case 1: playerColor = YELLOW; break;
+        case 2: playerColor = GREEN; break;
+        case 3: playerColor = CYAN; break;
+        case 4: playerColor = BLUE; break;
+        case 5: playerColor = MAGENTA; break;
+        default: playerColor = WHITE;
+        }
+        setlinecolor(playerColor);
+    }
+    else {
+        int healthColor = RGB(255 - p.health * 2.55, p.health * 2.55, 0);
+        setlinecolor(healthColor);
+    }
+
+    circle(p.x + PLAYER_SIZE / 2, p.y + PLAYER_SIZE / 2, PLAYER_SIZE / 2 + 2);
+
+    if (p.isColorful) {
+        setfillcolor(RGB(255, 255, 255));
+    }
+    else {
+        setfillcolor(WHITE);
+    }
+    solidcircle(p.x + PLAYER_SIZE / 2, p.y + PLAYER_SIZE / 2, PLAYER_SIZE / 2);
+
+    setfillcolor(BLACK);
+    solidcircle(p.x + PLAYER_SIZE / 3, p.y + PLAYER_SIZE / 3, 4);
+    solidcircle(p.x + 2 * PLAYER_SIZE / 3, p.y + PLAYER_SIZE / 3, 4);
+
+    drawShockwaveEffect();
+    updateShockwaveEffect();
+
+    settextcolor(WHITE);
+    setbkmode(TRANSPARENT);
+    settextstyle(24, 0, L"微软雅黑");
+
+    wchar_t infoStr[200];
+    swprintf(infoStr, 200, L"第 %d 关 | 剩余血量: %d%% | 倒计时: %d秒",
+        level, p.health, timeLeft);
+    outtextxy(20, 20, infoStr);
+
+    settextcolor(RGB(255, 200, 100));
+    outtextxy(20, 50, levelDescriptions[level - 1]);
+
+    setlinecolor(WHITE);
+    rectangle(20, 80, 320, 100);
+    if (p.health > 60) setfillcolor(GREEN);
+    else if (p.health > 30) setfillcolor(YELLOW);
+    else setfillcolor(RED);
+    solidrectangle(21, 81, 21 + (p.health * 3), 99);
+
+    if (p.hasShield) {
+        settextcolor(BLUE);
+        wchar_t shieldStr[50];
+        swprintf(shieldStr, 50, L"护盾剩余: %d秒", p.shieldTimer / 60);
+        outtextxy(340, 80, shieldStr);
+    }
+
+    if (p.isTimeSlowed) {
+        settextcolor(RGB(255, 200, 0));
+        wchar_t slowStr[50];
+        swprintf(slowStr, 50, L"减速剩余: %d秒", (TIME_SLOW_DURATION - (GetTickCount() - p.timeSlowStart)) / 1000);
+        outtextxy(340, 110, slowStr);
+    }
+
+    settextcolor(RGB(200, 200, 200));
+    settextstyle(24, 0, L"微软雅黑");
+    outtextxy(WIDTH - 280, 20, L"操作说明");
+
+    settextstyle(20, 0, L"微软雅黑");
+    outtextxy(WIDTH - 280, 60, L"W  ↑");
+    outtextxy(WIDTH - 280, 90, L"S  ↓");
+    outtextxy(WIDTH - 280, 120, L"A  ←");
+    outtextxy(WIDTH - 280, 150, L"D  →");
+
+    if (level >= 3) {
+        settextcolor(RGB(100, 200, 255));
+        outtextxy(WIDTH - 280, 200, L"蓝色：护盾");
+        settextcolor(RGB(100, 255, 100));
+        outtextxy(WIDTH - 280, 230, L"绿色：血包");
+    }
+
+    if (level == 5) {
+        settextcolor(RGB(255, 200, 0));
+        outtextxy(WIDTH - 280, 260, L"黄色：不死图腾");
+        settextcolor(RGB(200, 200, 200));
+        settextstyle(16, 0, L"微软雅黑");
+        outtextxy(WIDTH - 280, 290, L"→ 血量<70%时出现 | 场景仅1个");
+        outtextxy(WIDTH - 280, 310, L"→ 回血50% + 减速5秒 + 大范围冲击波");
+    }
+
+    settextcolor(RGB(150, 150, 150));
+    settextstyle(18, 0, L"微软雅黑");
+    outtextxy(20, HEIGHT - 30, L"空格键暂停 | 鼠标右键退出游戏");
+
+    FlushBatchDraw();
+}
+
+void drawButton(Button& btn) {
+    if (btn.hover) {
+        setfillcolor(RGB(80, 80, 80));
+        setlinecolor(RGB(255, 200, 0));
+    }
+    else {
+        setfillcolor(RGB(50, 50, 50));
+        setlinecolor(RGB(200, 200, 200));
+    }
+    solidroundrect(btn.x, btn.y, btn.x + btn.w, btn.y + btn.h, 10, 10);
+    settextcolor(WHITE);
+    setbkmode(TRANSPARENT);
+    settextstyle(28, 0, L"微软雅黑");
+    int textW = textwidth(btn.text);
+    int textH = textheight(btn.text);
+    outtextxy(btn.x + (btn.w - textW) / 2, btn.y + (btn.h - textH) / 2, btn.text);
+}
+
+bool checkButtonClick(Button& btn, MOUSEMSG& msg) {
+    bool clicked = false;
+    if (msg.x >= btn.x && msg.x <= btn.x + btn.w &&
+        msg.y >= btn.y && msg.y <= btn.y + btn.h &&
+        msg.uMsg == WM_LBUTTONDOWN) {
+        clicked = true;
+        playClickSound(); // 点击按钮播放音效
+    }
+    btn.hover = (msg.x >= btn.x && msg.x <= btn.x + btn.w &&
+        msg.y >= btn.y && msg.y <= btn.y + btn.h);
+    return clicked;
+}
+
+void drawMainMenu() {
+    cleardevice();
+    setbkcolor(BLACK);
+
+    settextcolor(RGB(255, 215, 0));
+    settextstyle(72, 0, L"微软雅黑");
+    const wchar_t title[] = L"地狱挑战 - 五关生死劫";
+    int titleW = textwidth(title);
+    outtextxy((WIDTH - titleW) / 2, HEIGHT / 2 - 150, title);
+
+    Button btnLevels = { BTN_LEVELS, WIDTH / 2 - 150, HEIGHT / 2 - 50, 300, 60, L"关卡选择", false };
+    Button btnExit = { BTN_EXIT, WIDTH / 2 - 150, HEIGHT / 2 + 30, 300, 60, L"退出游戏", false };
+
+    MOUSEMSG msg;
+    if (MouseHit()) {
+        msg = GetMouseMsg();
+        if (checkButtonClick(btnLevels, msg)) {
+            currentMenu = MENU_LEVEL_SELECT;
+        }
+        if (checkButtonClick(btnExit, msg)) {
+            cleanSDL3Audio(); // 退出前清理音频
+            closegraph();
+            exit(0);
+        }
+        checkButtonClick(btnExit, msg);
+    }
+
+    drawButton(btnLevels);
+    drawButton(btnExit);
+    FlushBatchDraw();
+}
+
+void drawLevelSelectMenu() {
+    cleardevice();
+    setbkcolor(BLACK);
+
+    settextcolor(RGB(255, 215, 0));
+    settextstyle(48, 0, L"微软雅黑");
+    const wchar_t title[] = L"选择关卡";
+    int titleW = textwidth(title);
+    outtextxy((WIDTH - titleW) / 2, HEIGHT / 2 - 200, title);
+
+    Button btn1 = { BTN_LEVEL_1, WIDTH / 2 - 300, HEIGHT / 2 - 100, 80, 60, L"1", false };
+    Button btn2 = { BTN_LEVEL_2, WIDTH / 2 - 180, HEIGHT / 2 - 100, 80, 60, L"2", false };
+    Button btn3 = { BTN_LEVEL_3, WIDTH / 2 - 60, HEIGHT / 2 - 100, 80, 60, L"3", false };
+    Button btn4 = { BTN_LEVEL_4, WIDTH / 2 + 60, HEIGHT / 2 - 100, 80, 60, L"4", false };
+    Button btn5 = { BTN_LEVEL_5, WIDTH / 2 + 180, HEIGHT / 2 - 100, 80, 60, L"5", false };
+    Button btnBack = { BTN_BACK, WIDTH / 2 - 150, HEIGHT / 2 + 50, 300, 60, L"返回主菜单", false };
+
+    MOUSEMSG msg;
+    if (MouseHit()) {
+        msg = GetMouseMsg();
+        if (checkButtonClick(btn1, msg)) { currentLevel = 1; currentMenu = MENU_GAME; }
+        if (checkButtonClick(btn2, msg)) { currentLevel = 2; currentMenu = MENU_GAME; }
+        if (checkButtonClick(btn3, msg)) { currentLevel = 3; currentMenu = MENU_GAME; }
+        if (checkButtonClick(btn4, msg)) { currentLevel = 4; currentMenu = MENU_GAME; }
+        if (checkButtonClick(btn5, msg)) { currentLevel = 5; currentMenu = MENU_GAME; }
+        if (checkButtonClick(btnBack, msg)) {
+            currentMenu = MENU_MAIN;
+            playMenuBgMusic(); // 返回主菜单播放菜单音乐
+        }
+    }
+
+    drawButton(btn1);
+    drawButton(btn2);
+    drawButton(btn3);
+    drawButton(btn4);
+    drawButton(btn5);
+    drawButton(btnBack);
+    FlushBatchDraw();
+}
+
+void drawPauseMenu() {
+    cleardevice();
+    setbkcolor(RGB(0, 0, 0));
+
+    settextcolor(RGB(255, 215, 0));
+    settextstyle(64, 0, L"微软雅黑");
+    const wchar_t title[] = L"游戏暂停";
+    int titleW = textwidth(title);
+    outtextxy((WIDTH - titleW) / 2, HEIGHT / 2 - 150, title);
+
+    Button btnContinue = { BTN_CONTINUE, WIDTH / 2 - 150, HEIGHT / 2 - 50, 300, 60, L"继续游戏", false };
+    Button btnBack = { BTN_BACK, WIDTH / 2 - 150, HEIGHT / 2 + 30, 300, 60, L"返回选关界面", false };
+
+    MOUSEMSG msg;
+    if (MouseHit()) {
+        msg = GetMouseMsg();
+        if (checkButtonClick(btnContinue, msg)) {
+            isPaused = false;
+            playLevelBgMusic(currentLevel); // 继续游戏恢复关卡音乐
+        }
+        if (checkButtonClick(btnBack, msg)) {
+            isPaused = false;
+            currentMenu = MENU_LEVEL_SELECT;
+            playMenuBgMusic(); // 返回选关界面播放菜单音乐
+        }
+    }
+
+    drawButton(btnContinue);
+    drawButton(btnBack);
+    FlushBatchDraw();
+}
+
+void drawLevelCompleteMenu(int level) {
+    cleardevice();
+    setbkcolor(BLACK);
+
+    settextcolor(GREEN);
+    settextstyle(56, 0, L"微软雅黑");
+    outtextxy((WIDTH - textwidth(L"关卡通过！")) / 2, HEIGHT / 2 - 150, L"关卡通过！");
+
+    Button btnNext, btnBack;
+    if (level < 5) {
+        btnNext = { BTN_NEXT, WIDTH / 2 - 150, HEIGHT / 2 - 10, 300, 60, L"下一关", false };
+        btnBack = { BTN_BACK, WIDTH / 2 - 150, HEIGHT / 2 + 70, 300, 60, L"返回选关界面", false };
+    }
+    else {
+        btnBack = { BTN_BACK, WIDTH / 2 - 150, HEIGHT / 2 - 10, 300, 60, L"返回选关界面", false };
+    }
+
+    MOUSEMSG msg;
+    if (MouseHit()) {
+        msg = GetMouseMsg();
+        if (level < 5 && checkButtonClick(btnNext, msg)) {
+            currentLevel = level + 1;
+            currentMenu = MENU_GAME;
+        }
+        if (checkButtonClick(btnBack, msg)) {
+            currentMenu = MENU_LEVEL_SELECT;
+            playMenuBgMusic();
+        }
+    }
+
+    if (level < 5) drawButton(btnNext);
+    drawButton(btnBack);
+    FlushBatchDraw();
+}
+
+void drawGameOverMenu(int level) {
+    cleardevice();
+    setbkcolor(BLACK);
+
+    settextcolor(RED);
+    settextstyle(56, 0, L"微软雅黑");
+    outtextxy((WIDTH - textwidth(L"游戏失败")) / 2, HEIGHT / 2 - 150, L"游戏失败");
+
+    settextcolor(WHITE);
+    wchar_t levelStr[100];
+    swprintf(levelStr, 100, L"止步于: 第 %d 关", level);
+    outtextxy((WIDTH - textwidth(levelStr)) / 2, HEIGHT / 2 - 20, levelStr);
+
+    Button btnRestart = { BTN_RESTART, WIDTH / 2 - 150, HEIGHT / 2 + 50, 300, 60, L"重新开始本关", false };
+    Button btnBack = { BTN_BACK, WIDTH / 2 - 150, HEIGHT / 2 + 130, 300, 60, L"返回选关界面", false };
+
+    MOUSEMSG msg;
+    if (MouseHit()) {
+        msg = GetMouseMsg();
+        if (checkButtonClick(btnRestart, msg)) {
+            currentMenu = MENU_GAME;
+        }
+        if (checkButtonClick(btnBack, msg)) {
+            currentMenu = MENU_LEVEL_SELECT;
+            playMenuBgMusic();
+        }
+    }
+
+    drawButton(btnRestart);
+    drawButton(btnBack);
+    FlushBatchDraw();
+}
+
+void drawGameCompleteMenu() {
+    cleardevice();
+    setbkcolor(BLACK);
+
+    settextcolor(RGB(255, 215, 0));
+    settextstyle(64, 0, L"微软雅黑");
+    outtextxy((WIDTH - textwidth(L"恭喜通关！")) / 2, HEIGHT / 2 - 150, L"恭喜通关！");
+
+    Button btnBack = { BTN_BACK, WIDTH / 2 - 150, HEIGHT / 2 + 20, 300, 60, L"返回选关界面", false };
+
+    MOUSEMSG msg;
+    if (MouseHit()) {
+        msg = GetMouseMsg();
+        if (checkButtonClick(btnBack, msg)) {
+            currentMenu = MENU_LEVEL_SELECT;
+            playMenuBgMusic();
+        }
+    }
+
+    drawButton(btnBack);
+    FlushBatchDraw();
+}
+
+void showLevelStart(int level) {
+    cleardevice();
+    setbkcolor(BLACK);
+
+    settextcolor(RGB(255, 215, 0));
+    settextstyle(56, 0, L"微软雅黑");
+    wchar_t levelStr[50];
+    swprintf(levelStr, 50, L"第 %d 关", level);
+
+    int textWidth = textwidth(levelStr);
+    outtextxy((WIDTH - textWidth) / 2, HEIGHT / 2 - 100, levelStr);
+
+    settextstyle(36, 0, L"微软雅黑");
+    settextcolor(RGB(200, 200, 255));
+
+    textWidth = textwidth(levelDescriptions[level - 1]);
+    outtextxy((WIDTH - textWidth) / 2, HEIGHT / 2, levelDescriptions[level - 1]);
+
+    settextstyle(28, 0, L"微软雅黑");
+    settextcolor(WHITE);
+
+    LevelConfig& cfg = levels[level - 1];
+    wchar_t detailStr[200];
+    if (level == 5) {
+        swprintf(detailStr, 200, L"超高密度障碍物 | 图腾仅血量<70%时出现 | 最大数量: %d",
+            cfg.maxObstacles);
+    }
+    else {
+        swprintf(detailStr, 200, L"速度: %d  最大数量: %d  障碍大小: %dpx",
+            cfg.baseSpeed, cfg.maxObstacles, cfg.obstacleSize);
+    }
+
+    textWidth = textwidth(detailStr);
+    outtextxy((WIDTH - textWidth) / 2, HEIGHT / 2 + 60, detailStr);
+
+    if (level == 5) {
+        settextcolor(RGB(255, 200, 0));
+        wchar_t totemTip[] = L"本关出现不死图腾（血量<70%时生成）！";
+        textWidth = textwidth(totemTip);
+        outtextxy((WIDTH - textWidth) / 2, HEIGHT / 2 + 100, totemTip);
+    }
+    else if (cfg.allowPowerUps) {
+        settextcolor(GREEN);
+        wchar_t powerUpStr[] = L"本关出现道具（血包/护盾）！";
+        textWidth = textwidth(powerUpStr);
+        outtextxy((WIDTH - textWidth) / 2, HEIGHT / 2 + 100, powerUpStr);
+    }
+
+    settextcolor(RGB(150, 150, 150));
+    wchar_t tipStr[] = L"点击鼠标左键开始 | 右键退出";
+    textWidth = textwidth(tipStr);
+    outtextxy((WIDTH - textWidth) / 2, HEIGHT / 2 + 160, tipStr);
+
+    FlushBatchDraw();
+
+    MOUSEMSG msg;
+    while (true) {
+        msg = GetMouseMsg();
+        if (msg.uMsg == WM_LBUTTONDOWN) {
+            playLevelBgMusic(level); // 点击开始播放关卡音乐
+            break;
+        }
+        if (msg.uMsg == WM_RBUTTONDOWN) {
+            cleanSDL3Audio();
+            closegraph();
+            exit(0);
+        }
+    }
+}
+
+// ==================== 主函数（SDL3适配） ====================
+int main(int argc, char* argv[]) { // SDL3无需SDL2main.lib，主函数带参数即可
+    // 初始化SDL3音频
+    if (!initSDL3Audio()) {
+        printf("音频初始化失败！\n");
+        return -1;
+    }
+    // 加载音频资源
+    loadAudioResources();
+
+    initgraph(WIDTH, HEIGHT);
+    SetWindowText(GetHWnd(), L"地狱挑战 - 五关生死劫（高帧率版）");
+
+    setbkcolor(BLACK);
+    cleardevice();
+    srand((unsigned)time(NULL));
+
+    // 播放菜单背景音乐
+    playMenuBgMusic();
+
+    while (true) {
+        switch (currentMenu) {
+        case MENU_MAIN:
+            drawMainMenu();
+            break;
+
+        case MENU_LEVEL_SELECT:
+            drawLevelSelectMenu();
+            break;
+
+        case MENU_GAME: {
+            showLevelStart(currentLevel);
+            LevelConfig& cfg = levels[currentLevel - 1];
+            Player player = initPlayer();
+            std::list<Obstacle> obstacles;
+            std::list<PowerUp> powerUps;
+
+            int frameCount = 0;
+            int timeLeft = 30;
+            clock_t lastTime = clock();
+            int spawnCounter = 0;
+            isTotemActive = false;
+
+            bool levelComplete = false;
+            bool gameOver = false;
+            while (!levelComplete && !gameOver) {
+                if (GetAsyncKeyState(VK_SPACE) & 0x8000) {
+                    Sleep(200);
+                    isPaused = !isPaused;
+                    if (isPaused) {
+                        stopAllBgMusic(); // 暂停时停止音乐
+                    }
+                    else {
+                        playLevelBgMusic(currentLevel); // 恢复时播放关卡音乐
+                    }
+                }
+
+                if (isPaused) {
+                    drawPauseMenu();
+                    continue;
+                }
+
+                if (player.isTimeSlowed) {
+                    DWORD elapsed = GetTickCount() - player.timeSlowStart;
+
+                    if (player.shockwaveCount == 0 && elapsed >= 0) {
+                        triggerShockwave(player, obstacles);
+                        player.shockwaveCount = 1;
+                    }
+                    else if (player.shockwaveCount == 1 && elapsed >= SHOCKWAVE_INTERVAL) {
+                        triggerShockwave(player, obstacles);
+                        player.shockwaveCount = 2;
+                    }
+                    else if (player.shockwaveCount == 2 && elapsed >= 2 * SHOCKWAVE_INTERVAL) {
+                        triggerShockwave(player, obstacles);
+                        player.shockwaveCount = 3;
+                    }
+
+                    if (elapsed >= TIME_SLOW_DURATION) {
+                        player.isTimeSlowed = false;
+                        applyTimeSlow(obstacles, false);
+                    }
+
+                    player.isMovingUp = (GetAsyncKeyState('W') & 0x8000) != 0;
+                    player.isMovingDown = (GetAsyncKeyState('S') & 0x8000) != 0;
+                    player.isMovingLeft = (GetAsyncKeyState('A') & 0x8000) != 0;
+                    player.isMovingRight = (GetAsyncKeyState('D') & 0x8000) != 0;
+
+                    if (player.isMovingLeft) {
+                        player.x -= MOVE_SPEED;
+                        if (player.x < 0) player.x = 0;
+                    }
+                    if (player.isMovingRight) {
+                        player.x += MOVE_SPEED;
+                        if (player.x > WIDTH - PLAYER_SIZE) player.x = WIDTH - PLAYER_SIZE;
+                    }
+                    if (player.isMovingUp) {
+                        player.y -= RISE_SPEED;
+                        if (player.y < 0) player.y = 0;
+                    }
+                    if (player.isMovingDown) {
+                        player.y += FALL_SPEED;
+                        if (player.y > HEIGHT - PLAYER_SIZE - 20)
+                            player.y = HEIGHT - PLAYER_SIZE - 20;
+                    }
+
+                    if (player.isColorful) {
+                        DWORD colorElapsed = GetTickCount() - player.colorStart;
+                        if (colorElapsed >= PLAYER_COLOR_DURATION) {
+                            player.isColorful = false;
+                        }
+                    }
+
+                    drawGame(player, obstacles, powerUps, currentLevel,
+                        timeLeft, frameCount, cfg);
+                    Sleep(8);
+                    continue;
+                }
+
+                frameCount++;
+                spawnCounter++;
+
+                clock_t currentTime = clock();
+                if (currentTime - lastTime >= CLOCKS_PER_SEC) {
+                    timeLeft--;
+                    lastTime = currentTime;
+                }
+
+                if (player.hasShield) {
+                    player.shieldTimer--;
+                    if (player.shieldTimer <= 0) {
+                        player.hasShield = false;
+                    }
+                }
+
+                if (player.isColorful) {
+                    DWORD colorElapsed = GetTickCount() - player.colorStart;
+                    if (colorElapsed >= PLAYER_COLOR_DURATION) {
+                        player.isColorful = false;
+                    }
+                }
+
+                player.isMovingUp = (GetAsyncKeyState('W') & 0x8000) != 0;
+                player.isMovingDown = (GetAsyncKeyState('S') & 0x8000) != 0;
+                player.isMovingLeft = (GetAsyncKeyState('A') & 0x8000) != 0;
+                player.isMovingRight = (GetAsyncKeyState('D') & 0x8000) != 0;
+
+                if (player.isMovingLeft) {
+                    player.x -= MOVE_SPEED;
+                    if (player.x < 0) player.x = 0;
+                }
+                if (player.isMovingRight) {
+                    player.x += MOVE_SPEED;
+                    if (player.x > WIDTH - PLAYER_SIZE) player.x = WIDTH - PLAYER_SIZE;
+                }
+                if (player.isMovingUp) {
+                    player.y -= RISE_SPEED;
+                    if (player.y < 0) player.y = 0;
+                }
+                if (player.isMovingDown) {
+                    player.y += FALL_SPEED;
+                    if (player.y > HEIGHT - PLAYER_SIZE - 20)
+                        player.y = HEIGHT - PLAYER_SIZE - 20;
+                }
+
+                if (!player.isMovingUp && !player.isMovingDown) {
+                    if (player.y < HEIGHT - PLAYER_SIZE - 20) {
+                        player.y += FALL_SPEED / 2;
+                    }
+                }
+
+                if (obstacles.size() < cfg.maxObstacles && spawnCounter >= cfg.spawnRate) {
+                    obstacles.push_back(createObstacle(cfg.baseSpeed, cfg.obstacleSize));
+                    spawnCounter = 0;
+                }
+
+                if (cfg.allowPowerUps && powerUps.size() < (currentLevel == 5 ? 2 : 3)) {
+                    if (rand() % 100 < cfg.powerUpChance) {
+                        PowerUpType type = (rand() % 2 == 0) ? POWERUP_SHIELD : POWERUP_HEALTH;
+                        powerUps.push_back(createPowerUp(cfg.baseSpeed, type, player.health));
+                    }
+                    if (currentLevel == 5) {
+                        if (player.health < TOTEM_SPAWN_HEALTH_THRESHOLD && !isTotemActive && rand() % 100 < cfg.totemChance) {
+                            powerUps.push_back(createPowerUp(cfg.baseSpeed, POWERUP_TOTEM, player.health));
+                        }
+                    }
+                }
+
+                for (auto it = obstacles.begin(); it != obstacles.end();) {
+                    if (!it->active) {
+                        it = obstacles.erase(it);
+                        continue;
+                    }
+
+                    it->y += it->speed;
+
+                    if (player.x < it->x + it->size &&
+                        player.x + PLAYER_SIZE > it->x &&
+                        player.y < it->y + it->size &&
+                        player.y + PLAYER_SIZE > it->y) {
+
+                        if (!player.hasShield) {
+                            player.health -= 10;
+                            if (player.health < 0) player.health = 0;
+                            playPlayerHurtSound(); // 播放受击音效
+                        }
+                        else {
+                            player.hasShield = false;
+                        }
+                        it->active = false;
+                    }
+
+                    if (it->y > HEIGHT) {
+                        it->active = false;
+                    }
+
+                    ++it;
+                }
+
+                for (auto it = powerUps.begin(); it != powerUps.end();) {
+                    if (!it->active) {
+                        if (it->type == POWERUP_TOTEM) {
+                            isTotemActive = false;
+                        }
+                        it = powerUps.erase(it);
+                        continue;
+                    }
+
+                    it->y += it->speed;
+
+                    int puSize = (it->type == POWERUP_TOTEM ? TOTEM_SIZE : POWERUP_SIZE);
+                    if (player.x < it->x + puSize &&
+                        player.x + PLAYER_SIZE > it->x &&
+                        player.y < it->y + puSize &&
+                        player.y + PLAYER_SIZE > it->y) {
+
+                        if (it->type == POWERUP_SHIELD) {
+                            player.hasShield = true;
+                            player.shieldTimer = 60;
+                            playPickShieldSound(); // 播放拾取护盾音效
+                        }
+                        else if (it->type == POWERUP_HEALTH) {
+                            player.health += 20;
+                            if (player.health > 100) player.health = 100;
+                            playPickHealthSound(); // 播放拾取血包音效
+                        }
+                        else if (it->type == POWERUP_TOTEM) {
+                            player.health += 50;
+                            if (player.health > 100) player.health = 100;
+                            player.isTimeSlowed = true;
+                            player.timeSlowStart = GetTickCount();
+                            player.shockwaveCount = 0;
+                            player.isColorful = true;
+                            player.colorStart = GetTickCount();
+                            applyTimeSlow(obstacles, true);
+                            isTotemActive = false;
+                            playPickTotemSound(); // 播放拾取图腾音效
+                        }
+                        it->active = false;
+                    }
+
+                    if (it->y > HEIGHT) {
+                        if (it->type == POWERUP_TOTEM) {
+                            isTotemActive = false;
+                        }
+                        it->active = false;
+                    }
+
+                    ++it;
+                }
+
+                drawGame(player, obstacles, powerUps, currentLevel,
+                    timeLeft, frameCount, cfg);
+
+                Sleep(8);
+
+                if (MouseHit()) {
+                    MOUSEMSG msg = GetMouseMsg();
+                    if (msg.uMsg == WM_RBUTTONDOWN) {
+                        cleanSDL3Audio(); // 退出前清理音频
+                        closegraph();
+                        return 0;
+                    }
+                }
+
+                if (player.health <= 0) {
+                    gameOver = true;
+                    currentMenu = MENU_GAME_OVER;
+                    playPlayerDeathMusic(); // 播放死亡音乐
+                }
+                else if (timeLeft <= 0) {
+                    levelComplete = true;
+                    if (currentLevel == 5) {
+                        currentMenu = MENU_GAME_COMPLETE;
+                        playGameWinMusic(); // 播放第五关胜利音乐
+                    }
+                    else {
+                        currentMenu = MENU_LEVEL_COMPLETE;
+                        playLevelWinMusic(); // 播放1-4关胜利音乐
+                    }
+                }
+            }
+
+            if (gameOver) {
+                drawGameOverMenu(currentLevel);
+            }
+            else if (levelComplete && currentLevel == 5) {
+                drawGameCompleteMenu();
+            }
+            else if (levelComplete) {
+                drawLevelCompleteMenu(currentLevel);
+            }
+
+            break;
+        }
+
+        case MENU_PAUSE:
+            drawPauseMenu();
+            break;
+
+        case MENU_LEVEL_COMPLETE:
+            drawLevelCompleteMenu(currentLevel);
+            break;
+
+        case MENU_GAME_OVER:
+            drawGameOverMenu(currentLevel);
+            break;
+
+        case MENU_GAME_COMPLETE:
+            drawGameCompleteMenu();
+            break;
+        }
+    }
+
+    cleanSDL3Audio(); // 程序结束清理音频
+    closegraph();
+    return 0;
+}
