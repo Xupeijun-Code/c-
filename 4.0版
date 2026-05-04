@@ -1,0 +1,2245 @@
+//#define _CRT_SECURE_NO_WARNINGS
+//#include <graphics.h>
+//#include <conio.h>
+//#include <stdlib.h>
+//#include <time.h>
+//#include <string>
+//#include <list>
+//#include <mmsystem.h>
+//#include <direct.h>
+//#include <cstdio>
+//#include <thread>
+//#include <atomic>
+//
+//#pragma comment(lib, "winmm.lib")
+//
+//// ==================== 常量定义 ====================
+//const int SHOCKWAVE_INTERVAL = 1670;
+//const int WIDTH = 1200;
+//const int HEIGHT = 800;
+//const int PLAYER_SIZE = 45;
+//const int POWERUP_SIZE = 30;
+//const int TOTEM_SIZE = 60;
+//const int TIME_SLOW_DURATION = 5000;
+//const int SHOCKWAVE_RADIUS = 400;
+//const int SHOCKWAVE_EXPAND_SPEED = 15;
+//const int SHOCKWAVE_PULSE_INTERVAL = 500;
+//const int SHOCKWAVE_LAYERS = 5;
+//const int PLAYER_COLOR_DURATION = 5000;
+//const float TIME_SLOW_FACTOR = 0.5f;
+//const float TIME_SLOW_GLOBAL_FACTOR = 0.1f;
+//
+//const int MOVE_SPEED = 20;
+//// Boss 受击震动
+//bool isBossHitShake = false;
+//DWORD bossHitShakeEndTime = 0;
+//int bossShakeOffsetX = 0;
+//int bossShakeOffsetY = 0;
+//
+//const int LEVEL4_MAX_OBSTACLES = 80;
+//const int LEVEL4_SPAWN_RATE = 7;
+//const int LEVEL5_MAX_OBSTACLES = 120;
+//const int LEVEL5_SPAWN_RATE = 3;
+//const int TOTEM_SPAWN_HEALTH_THRESHOLD = 200;
+//
+//const int BOSS_SIZE = 100;
+//const int BOSS_HEALTH = 500;
+//const int BOSS_SWORD_DAMAGE = 1;
+//const int TIME_STOP_DURATION = 5000;
+//const int SWORD_DROP_INTERVAL = 15000;
+//const int BOSS_X = WIDTH / 2 - BOSS_SIZE / 2;
+//const int BOSS_Y = 50;
+//const int SWORD_PROJECTILE_SPEED = 12;
+//const int SWORD_PROJECTILE_SIZE = 20;
+//
+//const int HURT_COOLDOWN = 200;
+//
+//enum PowerUpType {
+//    POWERUP_NONE,
+//    POWERUP_SHIELD,
+//    POWERUP_HEALTH,
+//    POWERUP_TOTEM
+//};
+//
+//enum ButtonType {
+//    BTN_LEVELS,
+//    BTN_EXIT,
+//    BTN_LEVEL_1,
+//    BTN_LEVEL_2,
+//    BTN_LEVEL_3,
+//    BTN_LEVEL_4,
+//    BTN_LEVEL_5,
+//    BTN_LEVEL_6,
+//    BTN_CONTINUE,
+//    BTN_BACK,
+//    BTN_NEXT,
+//    BTN_RESTART,
+//    BTN_HELP,
+//    BTN_HELP_BACK
+//};
+//
+//enum BossAttackType {
+//    BOSS_ATTACK_NORMAL,
+//    BOSS_ATTACK_SPREAD,
+//    BOSS_ATTACK_WAVE,
+//    BOSS_ATTACK_AIM,
+//    BOSS_ATTACK_RING
+//};
+//
+//// ==================== 结构体定义 ====================
+//struct Player {
+//    int x, y;
+//    int health;
+//    bool hasShield;
+//    int shieldTimer;
+//    bool isMovingUp;
+//    bool isMovingDown;
+//    bool isMovingLeft;
+//    bool isMovingRight;
+//    bool isTimeSlowed;
+//    DWORD timeSlowStart;
+//    int shockwaveCount;
+//    bool isColorful;
+//    DWORD colorStart;
+//
+//    bool isAutoSwordActive;
+//    DWORD lastAutoSwordTime;
+//    int autoSwordInterval;
+//
+//    bool isFastSwordActive;
+//    DWORD fastSwordEndTime;
+//    DWORD lastFastSwordTime;
+//    int fastSwordInterval;
+//    DWORD lastPulseShockwaveTime;
+//};
+//
+//struct Obstacle {
+//    int x, y;
+//    int speed;
+//    int size;
+//    bool active;
+//    int originalSpeed;
+//    int type;
+//    bool hasArrow;
+//    DWORD spawnTime;
+//};
+//
+//struct PowerUp {
+//    int x, y;
+//    int speed;
+//    PowerUpType type;
+//    bool active;
+//    int originalSpeed;
+//};
+//
+//struct Shockwave {
+//    int x, y;
+//    int radius;
+//    int maxRadius;
+//    int alpha;
+//    int type;
+//    bool active;
+//};
+//
+//struct LevelConfig {
+//    int baseSpeed;
+//    int maxObstacles;
+//    int spawnRate;
+//    int obstacleSize;
+//    bool allowPowerUps;
+//    int powerUpChance;
+//    int totemChance;
+//};
+//
+//struct Button {
+//    ButtonType type;
+//    int x, y, w, h;
+//    const wchar_t* text;
+//    bool hover;
+//};
+//
+//struct Boss {
+//    int x, y;
+//    int health;
+//    int maxHealth;
+//    bool isActive;
+//    DWORD lastAttackTime;
+//    int attackInterval;
+//    int originalAttackInterval;
+//    BossAttackType currentPattern;
+//    bool isTimeStopped;
+//    int moveDirection;
+//    int moveSpeed;
+//    int originalMoveSpeed;
+//    int moveRange;
+//    int originalX;
+//    int phase;
+//    int phaseMoveSpeed[3];
+//    int phaseAttackInterval[3];
+//    int phaseObstacleSpeed[3];
+//    bool phaseChanged;
+//    DWORD phaseChangeTime;
+//};
+//
+//struct SwordPowerUp {
+//    int x, y;
+//    int speed;
+//    bool active;
+//    DWORD dropTime;
+//};
+//
+//struct SwordSlash {
+//    int x, y;
+//    int angle;
+//    int length;
+//    int alpha;
+//    bool active;
+//};
+//
+//struct SwordProjectile {
+//    int x, y;
+//    int speed;
+//    int size;
+//    bool active;
+//};
+//
+//struct Arrow {
+//    int x, y;
+//    int speed;
+//    int size;
+//    bool active;
+//    DWORD shootTime;
+//    bool hasShot;
+//};
+//// ==================== 全局变量 ====================
+//LevelConfig levels[6] = {
+//    {9, 70, 5, 35, true, 3, 0},
+//    {12, 90, 4, 32, true, 5, 0},
+//    {15, 110, 3, 30, true, 8, 0},
+//    {18, 130, 2, 28, true, 12, 3},
+//    {21, 150, 1, 25, true, 15, 1},
+//    {8, 80, 8, 25, true, 30, 1}
+//};
+//
+//const wchar_t* levelDescriptions[6] = {
+//    L"第一关",
+//    L"第二关",
+//    L"第三关",
+//    L"第四关",
+//    L"第五关",
+//    L"最终关（Boss战）"
+//};
+//
+//bool isPaused = false;
+//std::list<Shockwave> shockwaves;
+//
+//enum MenuState {
+//    MENU_MAIN,
+//    MENU_LEVEL_SELECT,
+//    MENU_GAME,
+//    MENU_PAUSE,
+//    MENU_LEVEL_COMPLETE,
+//    MENU_GAME_OVER,
+//    MENU_GAME_COMPLETE,
+//    MENU_HELP
+//};
+//
+//MenuState currentMenu = MENU_MAIN;
+//int currentLevel = 1;
+//bool isTotemActive = false;
+//wchar_t currentBgMusicAlias[50] = L"";
+//IMAGE imgBoss;
+//IMAGE imgBossPhase2;
+//IMAGE imgBossPhase3;
+//Boss boss;
+//std::list<SwordSlash> swordSlashes;
+//std::list<SwordProjectile> swordProjectiles;
+//std::list<Arrow> arrows;
+//SwordPowerUp swordPowerUp;
+//bool isTimeStopped = false;
+//DWORD timeStopStart = 0;
+//
+//bool isGlobalSlowed = false;
+//DWORD globalSlowStart = 0;
+//int globalSlowDuration = 5000;
+//
+//DWORD lastHurtTime = 0;
+//
+//std::atomic<bool> isPlayingHurtSound(false);
+//std::atomic<bool> isPlayingPickTotemSound(false);
+//std::atomic<bool> isPlayingClickSound(false);
+//std::atomic<bool> isPlayingSwordAttackSound(false);
+//
+//struct AudioFileStatus {
+//    bool menuBgMusic;
+//    bool levelBgMusic[6];
+//    bool levelWinMusic;
+//    bool gameWinMusic;
+//    bool playerDeathMusic;
+//    bool clickSound;
+//    bool pickTotemSound;
+//    bool playerHurtSound;
+//    bool swordAttackSound;
+//    bool bossHitSound;   // Boss受击音效
+//};
+//
+//AudioFileStatus audioStatus;
+//
+//// ==================== 音频函数声明 ====================
+//bool initAudio();
+//void checkAudioFiles();
+//void testAudioFile(const wchar_t* filename, bool& status);
+//void playMenuBgMusic();
+//void playLevelBgMusic(int level);
+//void stopAllBgMusic();
+//void pauseBgMusic();
+//void resumeBgMusic();
+//void playClickSound();
+//void playPickTotemSound();
+//void playPlayerHurtSound();
+//void playLevelWinMusic();
+//void playGameWinMusic();
+//void playPlayerDeathMusic();
+//void playSwordAttackSound();
+//void cleanAudio();
+//
+//// ==================== 函数声明 ====================
+//Player initPlayer();
+//Obstacle createObstacle(int baseSpeed, int size);
+//PowerUp createPowerUp(int baseSpeed, PowerUpType type, int playerHealth, int level);
+//void drawGame(Player& p, std::list<Obstacle>& obstacles,
+//    std::list<PowerUp>& powerUps, int level,
+//    int timeLeft, int frameCount, LevelConfig& cfg);
+//void showLevelStart(int level);
+//void triggerShockwave(Player& p, std::list<Obstacle>& obstacles, int type);
+//void drawShockwaveEffect();
+//void updateShockwaveEffect();
+//void drawButton(Button& btn);
+//bool checkButtonClick(Button& btn, MOUSEMSG& msg);
+//void drawMainMenu();
+//void drawLevelSelectMenu();
+//void drawPauseMenu();
+//void triggerBossHitShake();
+//void drawLevelCompleteMenu(int level);
+//void drawGameOverMenu(int level);
+//void drawGameCompleteMenu();
+//void drawHelpMenu();
+//void applyTimeSlow(std::list<Obstacle>& obstacles, bool enable);
+//void applyGlobalSlow(std::list<Obstacle>& obstacles, std::list<PowerUp>& powerUps, bool enable);
+//
+//void initBoss();
+//void checkBossPhase(Player& player);
+//void updateBossMovement();
+//void updateBossAttack(std::list<Obstacle>& obstacles, Player& player);
+//void drawBoss();
+//void dropSwordPowerUp();
+//void drawSwordPowerUp();
+//void handleSwordPickup(Player& player, std::list<Obstacle>& obstacles, std::list<PowerUp>& powerUps);
+//void drawSwordSlash();
+//void updateSwordSlash();
+//void triggerSwordSlash(int x, int y, int angle);
+//void drawBossHealthBar();
+//BossAttackType getRandomAttackPattern();
+//void spawnBossObstacle(BossAttackType pattern, std::list<Obstacle>& obstacles, Player& player);
+//void updateSwordProjectiles(Player& player, std::list<Obstacle>& obstacles, Boss& boss);
+//void shootSwordProjectile(Player& player);
+//void drawSwordProjectiles();
+//void drawSwordProjectileShape(int x, int y, int size, bool isFastMode);
+//void addDamageNumber(int x, int y, int damage);
+//
+//// ==================== 音频文件检测函数 ====================
+//void testAudioFile(const wchar_t* filename, bool& status) {
+//    wchar_t cmd[256];
+//    wchar_t alias[100];
+//    swprintf(alias, 100, L"test_%p", filename);
+//    swprintf(cmd, 256, L"open \"%s\" alias %s", filename, alias);
+//    DWORD result = mciSendString(cmd, NULL, 0, NULL);
+//    if (result == 0) {
+//        status = true;
+//        swprintf(cmd, 256, L"close %s", alias);
+//        mciSendString(cmd, NULL, 0, NULL);
+//    }
+//    else {
+//        status = false;
+//        wprintf(L"文件缺失: %s\n", filename);
+//    }
+//}
+//
+//void checkAudioFiles() {
+//    wprintf(L"\n========== 音频文件检测 ==========\n");
+//    testAudioFile(L"audio/menu_bg.mp3", audioStatus.menuBgMusic);
+//    for (int i = 0; i < 6; i++) {
+//        wchar_t filename[100];
+//        swprintf(filename, 100, L"audio/level%d_bg.mp3", i + 1);
+//        testAudioFile(filename, audioStatus.levelBgMusic[i]);
+//    }
+//    testAudioFile(L"audio/level_win.mp3", audioStatus.levelWinMusic);
+//    testAudioFile(L"audio/game_win.mp3", audioStatus.gameWinMusic);
+//    testAudioFile(L"audio/player_death.mp3", audioStatus.playerDeathMusic);
+//    testAudioFile(L"audio/click.mp3", audioStatus.clickSound);
+//    testAudioFile(L"audio/pick_totem.mp3", audioStatus.pickTotemSound);
+//    testAudioFile(L"audio/player_hurt.mp3", audioStatus.playerHurtSound);
+//    testAudioFile(L"audio/sword_attack.mp3", audioStatus.swordAttackSound);
+//    testAudioFile(L"audio/boss_hit.mp3", audioStatus.bossHitSound);
+//    wprintf(L"================================\n\n");
+//}
+//
+//bool initAudio() { checkAudioFiles(); return true; }
+//
+//void playMenuBgMusic() {
+//    if (!audioStatus.menuBgMusic) return;
+//    if (wcscmp(currentBgMusicAlias, L"menu_bg") == 0) return;
+//    stopAllBgMusic();
+//    mciSendString(L"open \"audio/menu_bg.mp3\" alias menu_bg", NULL, 0, NULL);
+//    mciSendString(L"play menu_bg repeat", NULL, 0, NULL);
+//    wcscpy_s(currentBgMusicAlias, 50, L"menu_bg");
+//}
+//
+//void playLevelBgMusic(int level) {
+//    if (level < 1 || level > 6) return;
+//    if (!audioStatus.levelBgMusic[level - 1]) return;
+//    wchar_t alias[50];
+//    swprintf(alias, 50, L"level%d_bg", level);
+//    if (wcscmp(currentBgMusicAlias, alias) == 0) return;
+//    stopAllBgMusic();
+//    wchar_t cmd[256];
+//    swprintf(cmd, 256, L"open \"audio/level%d_bg.mp3\" alias %s", level, alias);
+//    mciSendString(cmd, NULL, 0, NULL);
+//    swprintf(cmd, 256, L"play %s repeat", alias);
+//    mciSendString(cmd, NULL, 0, NULL);
+//    wcscpy_s(currentBgMusicAlias, 50, alias);
+//}
+//
+//void addDamageNumber(int x, int y, int damage) {
+//    settextcolor(RGB(255, 200, 100));
+//    settextstyle(20, 0, L"微软雅黑");
+//    wchar_t dmgStr[10];
+//    swprintf(dmgStr, 10, L"-%d", damage);
+//    outtextxy(x - 10, y - 20, dmgStr);
+//}
+//
+//void stopAllBgMusic() {
+//    if (wcslen(currentBgMusicAlias) > 0) {
+//        wchar_t cmd[256];
+//        swprintf(cmd, 256, L"close %s", currentBgMusicAlias);
+//        mciSendString(cmd, NULL, 0, NULL);
+//        currentBgMusicAlias[0] = L'\0';
+//    }
+//}
+//
+//void pauseBgMusic() {
+//    if (wcslen(currentBgMusicAlias) > 0) {
+//        wchar_t cmd[256];
+//        swprintf(cmd, 256, L"pause %s", currentBgMusicAlias);
+//        mciSendString(cmd, NULL, 0, NULL);
+//    }
+//}
+//
+//void resumeBgMusic() {
+//    if (wcslen(currentBgMusicAlias) > 0) {
+//        wchar_t cmd[256];
+//        swprintf(cmd, 256, L"resume %s", currentBgMusicAlias);
+//        mciSendString(cmd, NULL, 0, NULL);
+//    }
+//}
+//
+//void playLevelWinMusic() {
+//    if (!audioStatus.levelWinMusic) return;
+//    mciSendString(L"close level_win", NULL, 0, NULL);
+//    mciSendString(L"open \"audio/level_win.mp3\" alias level_win", NULL, 0, NULL);
+//    mciSendString(L"play level_win", NULL, 0, NULL);
+//}
+//
+//void playGameWinMusic() {
+//    if (!audioStatus.gameWinMusic) return;
+//    mciSendString(L"close game_win", NULL, 0, NULL);
+//    mciSendString(L"open \"audio/game_win.mp3\" alias game_win", NULL, 0, NULL);
+//    mciSendString(L"play game_win", NULL, 0, NULL);
+//}
+//
+//void playPlayerDeathMusic() {
+//    if (!audioStatus.playerDeathMusic) return;
+//    mciSendString(L"close player_death", NULL, 0, NULL);
+//    mciSendString(L"open \"audio/player_death.mp3\" alias player_death", NULL, 0, NULL);
+//    mciSendString(L"play player_death", NULL, 0, NULL);
+//}
+//
+//void playClickSound() {
+//    if (!audioStatus.clickSound) return;
+//    if (isPlayingClickSound) return;
+//    isPlayingClickSound = true;
+//    std::thread([&]() {
+//        mciSendString(L"play \"audio/click.mp3\" from 0", NULL, 0, NULL);
+//        Sleep(100);
+//        isPlayingClickSound = false;
+//        }).detach();
+//}
+//
+//void playPickTotemSound() {
+//    if (!audioStatus.pickTotemSound) return;
+//    if (isPlayingPickTotemSound) return;
+//    isPlayingPickTotemSound = true;
+//    std::thread([&]() {
+//        mciSendString(L"play \"audio/pick_totem.mp3\" from 0", NULL, 0, NULL);
+//        Sleep(100);
+//        isPlayingPickTotemSound = false;
+//        }).detach();
+//}
+//
+//void playPlayerHurtSound() {
+//    if (!audioStatus.playerHurtSound) return;
+//    if (isPlayingHurtSound) return;
+//    isPlayingHurtSound = true;
+//    std::thread([&]() {
+//        mciSendString(L"play \"audio/player_hurt.mp3\" from 0", NULL, 0, NULL);
+//        Sleep(100);
+//        isPlayingHurtSound = false;
+//        }).detach();
+//}
+//
+//void playSwordAttackSound() {
+//    if (!audioStatus.swordAttackSound) return;
+//    if (isPlayingSwordAttackSound) return;
+//    isPlayingSwordAttackSound = true;
+//    std::thread([&]() {
+//        mciSendString(L"play \"audio/sword_attack.mp3\" from 0", NULL, 0, NULL);
+//        Sleep(100);
+//        isPlayingSwordAttackSound = false;
+//        }).detach();
+//}
+//
+//void playBossHitSound() {
+//    if (!audioStatus.bossHitSound) return;
+//
+//    // 限制播放频率，避免过于频繁
+//    static DWORD lastPlayTime = 0;
+//    DWORD now = GetTickCount();
+//    if (now - lastPlayTime < 50) return;
+//    lastPlayTime = now;
+//
+//    std::thread([]() {
+//        mciSendString(L"close boss_hit_temp", NULL, 0, NULL);
+//        mciSendString(L"open \"audio/boss_hit.mp3\" alias boss_hit_temp", NULL, 0, NULL);
+//        // 设置音量为最大（1000）
+//        mciSendString(L"setaudio boss_hit_temp volume to 1000", NULL, 0, NULL);
+//        mciSendString(L"play boss_hit_temp from 0", NULL, 0, NULL);
+//        }).detach();
+//}
+//
+//void cleanAudio() {
+//    stopAllBgMusic();
+//    mciSendString(L"close level_win", NULL, 0, NULL);
+//    mciSendString(L"close game_win", NULL, 0, NULL);
+//    mciSendString(L"close player_death", NULL, 0, NULL);
+//    mciSendString(L"close all", NULL, 0, NULL);
+//}
+//// ==================== 游戏逻辑函数实现 ====================
+//Player initPlayer() {
+//    Player p;
+//    p.x = WIDTH / 2 - PLAYER_SIZE / 2;
+//    p.y = HEIGHT - PLAYER_SIZE - 20;
+//    // 根据关卡设置初始血量
+//    if (currentLevel <= 4) {
+//        p.health = 300;
+//    }
+//    else if (currentLevel == 5) {
+//        p.health = 500;
+//    }
+//    else {
+//        p.health = 400;
+//    }
+//    p.hasShield = false;
+//    p.shieldTimer = 0;
+//    p.isMovingUp = false;
+//    p.isMovingDown = false;
+//    p.isMovingLeft = false;
+//    p.isMovingRight = false;
+//    p.isTimeSlowed = false;
+//    p.timeSlowStart = 0;
+//    p.shockwaveCount = 0;
+//    p.isColorful = false;
+//    p.colorStart = 0;
+//
+//    p.isAutoSwordActive = false;
+//    p.lastAutoSwordTime = 0;
+//    p.autoSwordInterval = 500;
+//
+//    p.isFastSwordActive = false;
+//    p.fastSwordEndTime = 0;
+//    p.lastFastSwordTime = 0;
+//    p.fastSwordInterval = 200;
+//
+//    p.lastPulseShockwaveTime = 0;
+//
+//    return p;
+//}
+//
+//void triggerBossHitShake() {
+//    isBossHitShake = true;
+//    bossHitShakeEndTime = GetTickCount() + 80;
+//    playBossHitSound();  // 播放受击音效
+//}
+//void applyBossHitShake(int& offsetX, int& offsetY) {
+//    if (isBossHitShake && GetTickCount() < bossHitShakeEndTime) {
+//        offsetX = rand() % 4 - 2;  // -2 到 2 的偏移，幅度小
+//        offsetY = rand() % 4 - 2;
+//    }
+//    else {
+//        offsetX = 0;
+//        offsetY = 0;
+//        isBossHitShake = false;
+//    }
+//}
+//Obstacle createObstacle(int baseSpeed, int size) {
+//    Obstacle o;
+//    o.x = rand() % (WIDTH - size);
+//    o.y = -size - rand() % 200;
+//    o.speed = baseSpeed + rand() % 3;
+//    o.originalSpeed = o.speed;
+//    o.size = size;
+//    o.active = true;
+//    o.type = rand() % 2;
+//    o.hasArrow = false;
+//    o.spawnTime = GetTickCount();
+//
+//    if (isGlobalSlowed) {
+//        o.speed = (int)(o.originalSpeed * TIME_SLOW_GLOBAL_FACTOR);
+//        if (o.speed < 1) o.speed = 1;
+//    }
+//    return o;
+//}
+//
+//PowerUp createPowerUp(int baseSpeed, PowerUpType type, int playerHealth, int level) {
+//    PowerUp p;
+//    int puSize = (type == POWERUP_TOTEM ? TOTEM_SIZE : POWERUP_SIZE);
+//    p.x = rand() % (WIDTH - puSize);
+//    p.y = -puSize - rand() % 200;
+//    int speedOffset;
+//    if (level == 6) {
+//        speedOffset = (type == POWERUP_TOTEM ? 6 : 4);
+//    }
+//    else {
+//        speedOffset = (type == POWERUP_TOTEM ? 12 : 8);
+//    }
+//    p.speed = baseSpeed - speedOffset;
+//    p.originalSpeed = p.speed;
+//    if (p.speed < 2) p.speed = 2;
+//    p.type = type;
+//    p.active = true;
+//    if (type == POWERUP_TOTEM) {
+//        isTotemActive = true;
+//    }
+//    if (isGlobalSlowed) {
+//        p.speed = (int)(p.originalSpeed * TIME_SLOW_GLOBAL_FACTOR);
+//        if (p.speed < 1) p.speed = 1;
+//    }
+//    return p;
+//}
+//
+//void drawShockwaveEffect() {
+//    for (auto& sw : shockwaves) {
+//        if (!sw.active) continue;
+//        int r, g, b;
+//        switch (sw.type) {
+//        case 1: r = 255; g = 215; b = 0; break;
+//        case 2: r = 255; g = 80; b = 40; break;
+//        default: r = 255; g = 200; b = 0;
+//        }
+//        int alpha = sw.alpha;
+//        for (int i = 0; i < SHOCKWAVE_LAYERS; i++) {
+//            int layerAlpha = alpha * (SHOCKWAVE_LAYERS - i) / SHOCKWAVE_LAYERS;
+//            int radiusOffset = i * 4;
+//            setlinecolor(RGB(r * layerAlpha / 255, g * layerAlpha / 255, b * layerAlpha / 255));
+//            setlinestyle(PS_SOLID, SHOCKWAVE_LAYERS - i);
+//            circle(sw.x, sw.y, sw.radius + radiusOffset);
+//        }
+//        setlinecolor(RGB(255, 255, 200));
+//        setlinestyle(PS_SOLID, 2);
+//        circle(sw.x, sw.y, sw.radius - 5);
+//    }
+//    setlinestyle(PS_SOLID, 1);
+//}
+//
+//void updateShockwaveEffect() {
+//    for (auto it = shockwaves.begin(); it != shockwaves.end();) {
+//        if (!it->active) { it = shockwaves.erase(it); continue; }
+//        it->radius += SHOCKWAVE_EXPAND_SPEED;
+//        it->alpha -= 12;
+//        if (it->radius > it->maxRadius || it->alpha <= 0) it->active = false;
+//        ++it;
+//    }
+//}
+//
+//void triggerShockwave(Player& p, std::list<Obstacle>& obstacles, int type) {
+//    int cx = p.x + PLAYER_SIZE / 2;
+//    int cy = p.y + PLAYER_SIZE / 2;
+//    Shockwave sw = { cx, cy, 15, SHOCKWAVE_RADIUS, 255, type, true };
+//    shockwaves.push_back(sw);
+//    for (auto it = obstacles.begin(); it != obstacles.end();) {
+//        if (!it->active) { it = obstacles.erase(it); continue; }
+//        int ox = it->x + it->size / 2;
+//        int oy = it->y + it->size / 2;
+//        if (abs(ox - cx) + abs(oy - cy) < SHOCKWAVE_RADIUS) it->active = false;
+//        ++it;
+//    }
+//    if (boss.isActive) {
+//        int bx = boss.x + BOSS_SIZE / 2;
+//        int by = boss.y + BOSS_SIZE / 2;
+//        if (abs(bx - cx) + abs(by - cy) < SHOCKWAVE_RADIUS) {
+//            int damage = 3;
+//            boss.health -= damage;
+//            if (boss.health < 0) boss.health = 0;
+//            addDamageNumber(bx, by, damage);
+//            triggerBossHitShake();  // 添加震动
+//        }
+//    }
+//}
+//
+//void applyTimeSlow(std::list<Obstacle>& obstacles, bool enable) {
+//    for (auto& obs : obstacles) {
+//        obs.speed = enable ? (int)(obs.originalSpeed * TIME_SLOW_FACTOR) : obs.originalSpeed;
+//    }
+//}
+//
+//void applyGlobalSlow(std::list<Obstacle>& obstacles, std::list<PowerUp>& powerUps, bool enable) {
+//    for (auto& obs : obstacles) {
+//        if (enable) {
+//            if (obs.originalSpeed == obs.speed || obs.originalSpeed == 0) obs.originalSpeed = obs.speed;
+//            obs.speed = (int)(obs.originalSpeed * TIME_SLOW_GLOBAL_FACTOR);
+//            if (obs.speed < 1) obs.speed = 1;
+//        }
+//        else if (obs.originalSpeed > 0) {
+//            obs.speed = obs.originalSpeed;
+//        }
+//    }
+//    for (auto& pu : powerUps) {
+//        if (enable) {
+//            if (pu.originalSpeed == pu.speed || pu.originalSpeed == 0) pu.originalSpeed = pu.speed;
+//            pu.speed = (int)(pu.originalSpeed * TIME_SLOW_GLOBAL_FACTOR);
+//            if (pu.speed < 1) pu.speed = 1;
+//        }
+//        else if (pu.originalSpeed > 0) {
+//            pu.speed = pu.originalSpeed;
+//        }
+//    }
+//}
+//// ==================== Boss关函数实现 ====================
+//void initBoss() {
+//    boss.originalX = BOSS_X;
+//    boss.x = BOSS_X;
+//    boss.y = BOSS_Y;
+//    boss.health = BOSS_HEALTH;
+//    boss.maxHealth = BOSS_HEALTH;
+//    boss.isActive = true;
+//    boss.lastAttackTime = GetTickCount();
+//    boss.currentPattern = BOSS_ATTACK_NORMAL;
+//    boss.isTimeStopped = false;
+//    boss.moveDirection = 1;
+//    boss.moveRange = 450;
+//    boss.phase = 0;
+//    boss.phaseChanged = false;
+//    boss.phaseChangeTime = 0;
+//
+//    boss.phaseMoveSpeed[0] = 7;
+//    boss.phaseMoveSpeed[1] = 10;
+//    boss.phaseMoveSpeed[2] = 12;
+//
+//    boss.phaseAttackInterval[0] = 600;
+//    boss.phaseAttackInterval[1] = 380;
+//    boss.phaseAttackInterval[2] = 200;
+//
+//    boss.phaseObstacleSpeed[0] = 7;
+//    boss.phaseObstacleSpeed[1] = 10;
+//    boss.phaseObstacleSpeed[2] = 12;
+//
+//    boss.moveSpeed = boss.phaseMoveSpeed[0];
+//    boss.originalMoveSpeed = boss.moveSpeed;
+//    boss.attackInterval = boss.phaseAttackInterval[0];
+//    boss.originalAttackInterval = boss.attackInterval;
+//
+//    isTimeStopped = false;
+//    swordPowerUp.active = false;
+//    swordSlashes.clear();
+//    swordProjectiles.clear();
+//
+//    loadimage(&imgBoss, L"./images/boss.png", BOSS_SIZE, BOSS_SIZE);
+//    loadimage(&imgBossPhase2, L"./images/boss_phase2.png", BOSS_SIZE, BOSS_SIZE);
+//    loadimage(&imgBossPhase3, L"./images/boss_phase3.png", BOSS_SIZE, BOSS_SIZE);
+//}
+//
+//void checkBossPhase(Player& player) {
+//    int percent = (boss.health * 100) / boss.maxHealth;
+//    int newPhase = (percent <= 33) ? 2 : ((percent <= 66) ? 1 : 0);
+//    if (newPhase != boss.phase) {
+//        boss.phase = newPhase;
+//        boss.phaseChanged = true;
+//        boss.phaseChangeTime = GetTickCount();
+//        boss.moveSpeed = boss.phaseMoveSpeed[newPhase];
+//        boss.originalMoveSpeed = boss.moveSpeed;
+//        boss.attackInterval = boss.phaseAttackInterval[newPhase];
+//        boss.originalAttackInterval = boss.attackInterval;
+//        boss.lastAttackTime = GetTickCount();
+//        if (newPhase == 2) {
+//            player.isAutoSwordActive = true;
+//            player.lastAutoSwordTime = GetTickCount();
+//            player.isFastSwordActive = false;
+//        }
+//    }
+//}
+//
+//BossAttackType getRandomAttackPattern() { return (BossAttackType)(rand() % 5); }
+//
+//void spawnBossObstacle(BossAttackType pattern, std::list<Obstacle>& obstacles, Player& player) {
+//    int cx = boss.x + BOSS_SIZE / 2;
+//    int cy = boss.y + BOSS_SIZE;
+//    int size = 25;
+//    int baseSpeed = boss.phaseObstacleSpeed[boss.phase];
+//
+//    switch (pattern) {
+//    case BOSS_ATTACK_NORMAL:
+//        for (int j = 0; j < 6; j++) {
+//            Obstacle obs = { cx - size / 2 + (j - 2.5) * 20, cy + j * 8, baseSpeed + j, size - 3, true, baseSpeed + j, 0, false, 0 };
+//            if (isGlobalSlowed) obs.speed = (int)(obs.originalSpeed * TIME_SLOW_GLOBAL_FACTOR);
+//            if (obs.speed < 1) obs.speed = 1;
+//            obstacles.push_back(obs);
+//        }
+//        break;
+//    case BOSS_ATTACK_SPREAD:
+//        for (int i = -4; i <= 4; i++) {
+//            Obstacle obs = { cx - size / 2 + i * 22, cy + abs(i) * 5, baseSpeed + abs(i), size, true, baseSpeed + abs(i), 0, false, 0 };
+//            if (isGlobalSlowed) obs.speed = (int)(obs.speed * TIME_SLOW_GLOBAL_FACTOR);
+//            if (obs.speed < 1) obs.speed = 1;
+//            obstacles.push_back(obs);
+//        }
+//        break;
+//    case BOSS_ATTACK_WAVE:
+//        for (int i = -3; i <= 3; i++) {
+//            Obstacle obs = { cx - size / 2 + i * 45, cy + abs(i) * 10 + (int)(sin(i * 0.8) * 15), baseSpeed + abs(i), size - 3, true, baseSpeed + abs(i), 0, false, 0 };
+//            if (isGlobalSlowed) obs.speed = (int)(obs.speed * TIME_SLOW_GLOBAL_FACTOR);
+//            if (obs.speed < 1) obs.speed = 1;
+//            obstacles.push_back(obs);
+//        }
+//        break;
+//    case BOSS_ATTACK_AIM: {
+//        int pcx = player.x + PLAYER_SIZE / 2;
+//        for (int j = -2; j <= 2; j++) {
+//            int offset = (pcx - cx) / 4 * j;
+//            Obstacle obs = { cx - size / 2 + offset, cy + j * 12, baseSpeed + abs(j), size, true, baseSpeed + abs(j), 0, false, 0 };
+//            if (isGlobalSlowed) obs.speed = (int)(obs.speed * TIME_SLOW_GLOBAL_FACTOR);
+//            if (obs.speed < 1) obs.speed = 1;
+//            obstacles.push_back(obs);
+//        }
+//        break;
+//    }
+//    case BOSS_ATTACK_RING:
+//        for (int i = 0; i < 16; i++) {
+//            double angle = i * 3.14159 * 2 / 16;
+//            Obstacle obs = { cx - size / 2 + (int)(cos(angle) * 55), cy + (int)(sin(angle) * 45), baseSpeed, size - 5, true, baseSpeed, 0, false, 0 };
+//            if (isGlobalSlowed) obs.speed = (int)(obs.speed * TIME_SLOW_GLOBAL_FACTOR);
+//            if (obs.speed < 1) obs.speed = 1;
+//            obstacles.push_back(obs);
+//        }
+//        break;
+//    }
+//}
+//
+//void updateBossMovement() {
+//    if (!boss.isActive || boss.isTimeStopped) return;
+//    int spd = boss.moveSpeed;
+//    if (isGlobalSlowed && !isTimeStopped) {
+//        spd = (int)(boss.originalMoveSpeed * TIME_SLOW_GLOBAL_FACTOR);
+//        if (spd < 1) spd = 1;
+//    }
+//    boss.x += boss.moveDirection * spd;
+//    if (boss.x > boss.originalX + boss.moveRange) { boss.x = boss.originalX + boss.moveRange; boss.moveDirection = -1; }
+//    if (boss.x < boss.originalX - boss.moveRange) { boss.x = boss.originalX - boss.moveRange; boss.moveDirection = 1; }
+//}
+//
+//void updateBossAttack(std::list<Obstacle>& obstacles, Player& player) {
+//    if (!boss.isActive || boss.isTimeStopped || isTimeStopped) return;
+//    int interval = boss.attackInterval;
+//    if (isGlobalSlowed) interval = (int)(boss.originalAttackInterval / TIME_SLOW_GLOBAL_FACTOR);
+//    if (GetTickCount() - boss.lastAttackTime >= interval) {
+//        boss.currentPattern = getRandomAttackPattern();
+//        spawnBossObstacle(boss.currentPattern, obstacles, player);
+//        boss.lastAttackTime = GetTickCount();
+//    }
+//}
+//
+//void drawBoss() {
+//    if (!boss.isActive) return;
+//
+//    // 应用受击震动偏移
+//    int shakeX = 0, shakeY = 0;
+//    applyBossHitShake(shakeX, shakeY);
+//
+//    IMAGE* img = &imgBoss;
+//    if (boss.phase == 1) img = &imgBossPhase2;
+//    else if (boss.phase == 2) img = &imgBossPhase3;
+//
+//    // 绘制时应用偏移
+//    putimage(boss.x + shakeX, boss.y + shakeY, img);
+//
+//    // 时停效果（不受震动影响）
+//    if (boss.isTimeStopped) {
+//        setfillcolor(RGB(200, 200, 200));
+//        setlinestyle(PS_SOLID, 3);
+//        setlinecolor(RGB(255, 255, 0));
+//        rectangle(boss.x - 3, boss.y - 3, boss.x + BOSS_SIZE + 3, boss.y + BOSS_SIZE + 3);
+//        setlinestyle(PS_SOLID, 1);
+//    }
+//
+//    drawBossHealthBar();
+//}
+//
+//void drawBossHealthBar() {
+//    int bw = 400, bh = 20, bx = WIDTH / 2 - bw / 2, by = 10;
+//    setfillcolor(RGB(50, 50, 50));
+//    solidrectangle(bx, by, bx + bw, by + bh);
+//    int hw = bw * boss.health / boss.maxHealth;
+//    setfillcolor(boss.health > boss.maxHealth / 2 ? RGB(0, 255, 0) : (boss.health > boss.maxHealth / 4 ? RGB(255, 255, 0) : RGB(255, 0, 0)));
+//    solidrectangle(bx, by, bx + hw, by + bh);
+//    setlinecolor(WHITE);
+//    rectangle(bx, by, bx + bw, by + bh);
+//    settextcolor(WHITE);
+//    settextstyle(16, 0, L"微软雅黑");
+//    wchar_t ht[50];
+//    swprintf(ht, 50, L"Boss血量: %d/%d", boss.health, boss.maxHealth);
+//    outtextxy(bx + bw / 2 - textwidth(ht) / 2, by - 25, ht);
+//}
+//
+//void dropSwordPowerUp() {
+//    if (!boss.isActive || isTimeStopped) return;
+//    static DWORD lastDrop = 0;
+//    DWORD now = GetTickCount();
+//    if (!swordPowerUp.active && now - lastDrop >= SWORD_DROP_INTERVAL) {
+//        swordPowerUp.x = boss.x + BOSS_SIZE / 2 - 15;
+//        swordPowerUp.y = boss.y + BOSS_SIZE;
+//        swordPowerUp.speed = 5;
+//        swordPowerUp.active = true;
+//        swordPowerUp.dropTime = now;
+//        lastDrop = now;
+//    }
+//    if (swordPowerUp.active) {
+//        swordPowerUp.y += swordPowerUp.speed;
+//        if (swordPowerUp.y > HEIGHT) swordPowerUp.active = false;
+//    }
+//}
+//
+//void drawSwordPowerUp() {
+//    if (!swordPowerUp.active) return;
+//    setfillcolor(RGB(192, 192, 192));
+//    solidrectangle(swordPowerUp.x + 5, swordPowerUp.y, swordPowerUp.x + 10, swordPowerUp.y + 25);
+//    setfillcolor(RGB(255, 215, 0));
+//    solidrectangle(swordPowerUp.x, swordPowerUp.y + 25, swordPowerUp.x + 15, swordPowerUp.y + 30);
+//    setlinecolor(RGB(255, 255, 100));
+//    circle(swordPowerUp.x + 7, swordPowerUp.y + 15, 12);
+//}
+//
+//void handleSwordPickup(Player& player, std::list<Obstacle>& obstacles, std::list<PowerUp>& powerUps) {
+//    if (!swordPowerUp.active) return;
+//    if (player.x < swordPowerUp.x + 15 && player.x + PLAYER_SIZE > swordPowerUp.x &&
+//        player.y < swordPowerUp.y + 30 && player.y + PLAYER_SIZE > swordPowerUp.y) {
+//        swordPowerUp.active = false;
+//        isGlobalSlowed = true;
+//        globalSlowStart = GetTickCount();
+//        globalSlowDuration = 5000;
+//        player.isColorful = true;
+//        player.colorStart = GetTickCount();
+//        triggerShockwave(player, obstacles, 2);
+//        player.isFastSwordActive = true;
+//        player.fastSwordEndTime = GetTickCount() + 5000;
+//        player.lastFastSwordTime = GetTickCount();
+//        playPickTotemSound();
+//    }
+//}
+//
+//void drawSwordSlash() {
+//    for (auto& slash : swordSlashes) {
+//        if (!slash.active) continue;
+//        double rad = slash.angle * 3.14159 / 180;
+//        int ex = slash.x + (int)(cos(rad) * slash.length);
+//        int ey = slash.y + (int)(sin(rad) * slash.length);
+//        setlinecolor(RGB(255, 255, 100));
+//        setlinestyle(PS_SOLID, 4);
+//        line(slash.x, slash.y, ex, ey);
+//        setlinecolor(RGB(255, 200, 0));
+//        setlinestyle(PS_SOLID, 2);
+//        line(slash.x + 2, slash.y, ex + 2, ey);
+//        line(slash.x - 2, slash.y, ex - 2, ey);
+//    }
+//    setlinestyle(PS_SOLID, 1);
+//}
+//
+//void updateSwordSlash() {
+//    for (auto it = swordSlashes.begin(); it != swordSlashes.end();) {
+//        it->alpha -= 15;
+//        if (it->alpha <= 0 || !it->active) it = swordSlashes.erase(it);
+//        else ++it;
+//    }
+//}
+//
+//void shootSwordProjectile(Player& player) {
+//    int cx = player.x + PLAYER_SIZE / 2;
+//    int offsets[] = { -15, 0, 15 };
+//    for (int i = 0; i < 3; i++) {
+//        SwordProjectile proj = { cx + offsets[i] - SWORD_PROJECTILE_SIZE / 2, player.y - 10, SWORD_PROJECTILE_SPEED, SWORD_PROJECTILE_SIZE, true };
+//        swordProjectiles.push_back(proj);
+//    }
+//    playSwordAttackSound();
+//}
+//
+//void drawSwordProjectileShape(int x, int y, int size, bool isFast) {
+//    int cx = x + size / 2, ty = y, by = y + size;
+//    COLORREF core, edge, glow;
+//    if (isFast) { core = RGB(255, 80, 60); edge = RGB(255, 200, 100); glow = RGB(255, 100, 80); }
+//    else { core = RGB(60, 200, 255); edge = RGB(150, 240, 255); glow = RGB(80, 180, 255); }
+//    for (int i = 3; i >= 1; i--) {
+//        int a = 80 - i * 15; if (a < 20) a = 20;
+//        setlinecolor(RGB(GetRValue(glow) * a / 100, GetGValue(glow) * a / 100, GetBValue(glow) * a / 100));
+//        setlinestyle(PS_SOLID, i + 2);
+//        POINT pts[] = { {cx, ty - 3}, {cx - 6 - i, by - 10}, {cx - 3, by - 3}, {cx, by + 2}, {cx + 3, by - 3}, {cx + 6 + i, by - 10} };
+//        polyline(pts, 6);
+//    }
+//    POINT fill[] = { {cx, ty - 2}, {cx - 6, by - 10}, {cx - 3, by - 3}, {cx, by}, {cx + 3, by - 3}, {cx + 6, by - 10} };
+//    setfillcolor(core);
+//    solidpolygon(fill, 6);
+//    setlinecolor(edge);
+//    setlinestyle(PS_SOLID, 3);
+//    line(cx, ty - 2, cx, by - 8);
+//    line(cx - 2, ty + 2, cx - 5, by - 10);
+//    line(cx + 2, ty + 2, cx + 5, by - 10);
+//    setlinecolor(RGB(255, 255, 200));
+//    setlinestyle(PS_SOLID, 2);
+//    line(cx - 1, ty, cx - 1, by - 8);
+//    line(cx + 1, ty, cx + 1, by - 8);
+//    setfillcolor(RGB(180, 120, 60));
+//    solidrectangle(cx - 4, by - 4, cx + 4, by + 1);
+//    setfillcolor(RGB(240, 180, 100));
+//    solidrectangle(cx - 3, by - 3, cx + 3, by);
+//    setfillcolor(RGB(255, 255, 255));
+//    solidcircle(cx, ty - 1, 3);
+//    setfillcolor(RGB(255, 255, 200));
+//    solidcircle(cx, ty - 1, 2);
+//    setlinestyle(PS_SOLID, 1);
+//    for (int i = -1; i <= 1; i++) {
+//        setlinecolor(isFast ? RGB(255, 150 + i * 50, 100) : RGB(100 + i * 30, 200, 255));
+//        line(cx + i, ty + 5, cx + i, by - 10);
+//    }
+//}
+//
+//void updateSwordProjectiles(Player& player, std::list<Obstacle>& obstacles, Boss& boss) {
+//    for (auto it = swordProjectiles.begin(); it != swordProjectiles.end();) {
+//        it->y -= it->speed;
+//        if (it->y + it->size < 0 || it->y > HEIGHT) { it = swordProjectiles.erase(it); continue; }
+//        if (boss.isActive && it->x + it->size > boss.x && it->x < boss.x + BOSS_SIZE &&
+//            it->y + it->size > boss.y && it->y < boss.y + BOSS_SIZE) {
+//            boss.health -= BOSS_SWORD_DAMAGE;
+//            if (boss.health < 0) boss.health = 0;
+//            triggerBossHitShake();  // 添加震动
+//            it = swordProjectiles.erase(it);
+//            continue;
+//        }
+//        bool hit = false;
+//        for (auto obsIt = obstacles.begin(); obsIt != obstacles.end();) {
+//            if (!obsIt->active) { ++obsIt; continue; }
+//            if (it->x + it->size > obsIt->x && it->x < obsIt->x + obsIt->size &&
+//                it->y + it->size > obsIt->y && it->y < obsIt->y + obsIt->size) {
+//                obsIt = obstacles.erase(obsIt);
+//                hit = true;
+//                break;
+//            }
+//            else ++obsIt;
+//        }
+//        if (hit) it = swordProjectiles.erase(it);
+//        else ++it;
+//    }
+//}
+//
+//void drawSwordProjectiles() {
+//    for (auto& proj : swordProjectiles) {
+//        if (!proj.active) continue;
+//        drawSwordProjectileShape(proj.x, proj.y, proj.size, proj.speed >= SWORD_PROJECTILE_SPEED + 2);
+//    }
+//}
+//// ==================== 绘制函数 ====================
+//void drawGame(Player& p, std::list<Obstacle>& obstacles,
+//    std::list<PowerUp>& powerUps, int level,
+//    int timeLeft, int frameCount, LevelConfig& cfg) {
+//    setfillcolor(RGB(20, 15, 25));
+//    solidrectangle(0, 0, WIDTH, HEIGHT);
+//
+//    setlinecolor(RGB(30, 30, 30));
+//    for (int i = 0; i < WIDTH; i += 50) line(i, 0, i, HEIGHT);
+//    for (int i = 0; i < HEIGHT; i += 50) line(0, i, WIDTH, i);
+//
+//    if (level == 6 && boss.isActive) {
+//        drawBoss();
+//        drawSwordPowerUp();
+//        drawSwordSlash();
+//        drawSwordProjectiles();
+//        updateSwordSlash();
+//    }
+//
+//    for (auto& arrow : arrows) {
+//        if (!arrow.active) continue;
+//        setfillcolor(RGB(139, 69, 19));
+//        solidrectangle(arrow.x, arrow.y, arrow.x + arrow.size, arrow.y + arrow.size / 2);
+//        setfillcolor(RGB(192, 192, 192));
+//        POINT apt[] = { {arrow.x + arrow.size, arrow.y}, {arrow.x + arrow.size + 5, arrow.y + arrow.size / 4}, {arrow.x + arrow.size, arrow.y + arrow.size / 2} };
+//        solidpolygon(apt, 3);
+//        setfillcolor(RGB(200, 200, 200));
+//        solidrectangle(arrow.x, arrow.y + arrow.size / 2, arrow.x + 3, arrow.y + arrow.size);
+//    }
+//
+//    for (auto& obs : obstacles) {
+//        if (!obs.active) continue;
+//        int x = obs.x, y = obs.y, s = obs.size;
+//        float darken = p.isTimeSlowed ? 0.6f : 1.0f;
+//        if (obs.type == 0) {
+//            setfillcolor(RGB(70 * darken, 100 * darken, 70 * darken));
+//            solidrectangle(x, y, x + s, y + s);
+//            setfillcolor(RGB(50 * darken, 70 * darken, 50 * darken));
+//            solidrectangle(x + s / 5, y + s / 3, x + s / 2, y + s / 2);
+//            solidrectangle(x + s / 2, y + s / 4, x + s - 5, y + s / 3);
+//            setfillcolor(RGB(0, 0, 0));
+//            solidrectangle(x + s / 4, y + s / 3, x + s / 3, y + s / 2);
+//            solidrectangle(x + 2 * s / 3, y + s / 3, x + 3 * s / 4, y + s / 2);
+//            solidrectangle(x + s / 3, y + 2 * s / 3, x + 2 * s / 3, y + 3 * s / 4);
+//        }
+//        else {
+//            setfillcolor(RGB(220 * darken, 220 * darken, 210 * darken));
+//            solidrectangle(x, y, x + s, y + s);
+//            setfillcolor(RGB(0, 0, 0));
+//            solidrectangle(x + s / 4, y + s / 3, x + s / 3, y + s / 2);
+//            solidrectangle(x + 2 * s / 3, y + s / 3, x + 3 * s / 4, y + s / 2);
+//            solidcircle(x + s / 2 - 3, y + s / 2, 2);
+//            solidcircle(x + s / 2 + 3, y + s / 2, 2);
+//            setlinecolor(RGB(0, 0, 0));
+//            setlinestyle(PS_SOLID, 1);
+//            line(x + s / 3, y + 2 * s / 3, x + 2 * s / 3, y + 2 * s / 3);
+//            for (int i = 0; i < 4; i++) {
+//                line(x + s / 3 + i * s / 6, y + 2 * s / 3, x + s / 3 + i * s / 6, y + 2 * s / 3 + s / 8);
+//            }
+//        }
+//    }
+//    setlinestyle(PS_SOLID, 1);
+//
+//    for (auto& pu : powerUps) {
+//        if (!pu.active) continue;
+//        if (pu.type == POWERUP_SHIELD) {
+//            setfillcolor(BLUE);
+//            solidcircle(pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2, POWERUP_SIZE / 2);
+//            setlinecolor(WHITE);
+//            circle(pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2, POWERUP_SIZE / 3);
+//        }
+//        else if (pu.type == POWERUP_HEALTH) {
+//            setfillcolor(GREEN);
+//            solidcircle(pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2, POWERUP_SIZE / 2);
+//            setlinecolor(WHITE);
+//            line(pu.x + POWERUP_SIZE / 2 - 8, pu.y + POWERUP_SIZE / 2, pu.x + POWERUP_SIZE / 2 + 8, pu.y + POWERUP_SIZE / 2);
+//            line(pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2 - 8, pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2 + 8);
+//        }
+//        else if (pu.type == POWERUP_TOTEM) {
+//            int cx = pu.x + TOTEM_SIZE / 2, cy = pu.y + TOTEM_SIZE / 2, w = TOTEM_SIZE, h = TOTEM_SIZE;
+//            for (int i = 3; i >= 1; i--) {
+//                setlinecolor(RGB(255, 200 + i * 10, 50));
+//                setlinestyle(PS_SOLID, i);
+//                rectangle(cx - w / 2 - i, cy - h / 2 - i, cx + w / 2 + i, cy + h / 2 + i);
+//            }
+//            setfillcolor(RGB(60, 90, 60));
+//            solidrectangle(cx - w / 3, cy, cx + w / 3, cy + h / 2);
+//            setfillcolor(RGB(255, 200, 80));
+//            solidrectangle(cx - w / 5, cy + 5, cx + w / 5, cy + 8);
+//            solidrectangle(cx - w / 5, cy + h / 3, cx + w / 5, cy + h / 3 + 3);
+//            setfillcolor(RGB(255, 210, 100));
+//            solidrectangle(cx - w / 3, cy - h / 2 + 5, cx + w / 3, cy);
+//            setfillcolor(RGB(220, 170, 70));
+//            solidrectangle(cx - w / 3, cy - 5, cx + w / 3, cy);
+//            setfillcolor(RGB(80, 60, 40));
+//            solidrectangle(cx - w / 4, cy - h / 3 + 5, cx - w / 6, cy - h / 3 + 8);
+//            solidrectangle(cx + w / 6, cy - h / 3 + 5, cx + w / 4, cy - h / 3 + 8);
+//            setfillcolor(RGB(80, 200, 200));
+//            solidcircle(cx - w / 5, cy - h / 5, 5);
+//            solidcircle(cx + w / 5, cy - h / 5, 5);
+//            setfillcolor(RGB(200, 255, 255));
+//            solidcircle(cx - w / 5 - 1, cy - h / 5 - 1, 2);
+//            solidcircle(cx + w / 5 - 1, cy - h / 5 - 1, 2);
+//            setfillcolor(RGB(0, 80, 80));
+//            solidcircle(cx - w / 5, cy - h / 5, 2);
+//            solidcircle(cx + w / 5, cy - h / 5, 2);
+//            setlinecolor(RGB(100, 70, 50));
+//            setlinestyle(PS_SOLID, 2);
+//            line(cx - w / 6, cy - h / 8, cx + w / 6, cy - h / 8);
+//            setfillcolor(RGB(255, 180, 70));
+//            solidrectangle(cx - w / 2, cy - h / 4, cx - w / 3, cy - h / 6);
+//            solidrectangle(cx + w / 3, cy - h / 4, cx + w / 2, cy - h / 6);
+//            setfillcolor(RGB(200, 150, 50));
+//            solidrectangle(cx - w / 4, cy + h / 2 - 5, cx + w / 4, cy + h / 2);
+//            setfillcolor(RGB(180, 130, 40));
+//            solidrectangle(cx - w / 5, cy + h / 2 - 3, cx + w / 5, cy + h / 2);
+//            setlinestyle(PS_SOLID, 1);
+//        }
+//    }
+//
+//    if (p.hasShield) {
+//        setlinecolor(YELLOW);
+//        for (int i = 0; i < 3; i++) circle(p.x + PLAYER_SIZE / 2, p.y + PLAYER_SIZE / 2, PLAYER_SIZE / 2 + 5 + i * 3);
+//    }
+//    if (p.isTimeSlowed) {
+//        setlinecolor(RGB(255, 200, 0));
+//        circle(p.x + PLAYER_SIZE / 2, p.y + PLAYER_SIZE / 2, PLAYER_SIZE / 2 + 8);
+//        settextstyle(20, 0, L"微软雅黑");
+//        outtextxy(p.x + PLAYER_SIZE / 2 - 15, p.y + PLAYER_SIZE / 2 - 10, L"减速");
+//    }
+//
+//    if (p.isColorful) {
+//        int step = (GetTickCount() - p.colorStart) / 100 % 6;
+//        COLORREF cols[] = { RED,YELLOW,GREEN,CYAN,BLUE,MAGENTA };
+//        setlinecolor(cols[step]);
+//    }
+//    else {
+//        setlinecolor(RGB(255 - p.health * 0.51, p.health * 0.51, 0));
+//    }
+//
+//    int cx = p.x + PLAYER_SIZE / 2, cy = p.y + PLAYER_SIZE / 2, hs = PLAYER_SIZE - 5;
+//    if (p.hasShield) {
+//        setlinecolor(YELLOW);
+//        setlinestyle(PS_SOLID, 3);
+//        rectangle(cx - hs / 2 - 2, cy - hs / 2 - 2, cx + hs / 2 + 2, cy + hs / 2 + 2);
+//    }
+//    if (p.isColorful) {
+//        int step = (GetTickCount() - p.colorStart) / 100 % 6;
+//        COLORREF sk[] = { RGB(255,200,150), RGB(255,220,150), RGB(220,255,150), RGB(150,255,200), RGB(150,200,255), RGB(255,150,200) };
+//        setfillcolor(sk[step]);
+//    }
+//    else {
+//        setfillcolor(RGB(200, 160, 130));
+//    }
+//    solidrectangle(cx - hs / 2, cy - hs / 2, cx + hs / 2, cy + hs / 2);
+//    setfillcolor(RGB(120, 80, 50));
+//    solidrectangle(cx - hs / 2, cy - hs / 2, cx + hs / 2, cy - hs / 3);
+//    setfillcolor(RGB(100, 65, 40));
+//    solidrectangle(cx - hs / 2, cy - hs / 3, cx + hs / 2, cy - hs / 3 + 4);
+//    setlinecolor(RGB(80, 50, 35));
+//    setlinestyle(PS_SOLID, 3);
+//    line(cx - hs / 3, cy - hs / 5, cx - hs / 6, cy - hs / 6);
+//    line(cx + hs / 3, cy - hs / 5, cx + hs / 6, cy - hs / 6);
+//    setfillcolor(RGB(0, 0, 0));
+//    solidrectangle(cx - hs / 2 + 5, cy - hs / 4 - 2, cx - hs / 6 - 2, cy - hs / 8 + 2);
+//    solidrectangle(cx + hs / 6 + 2, cy - hs / 4 - 2, cx + hs / 2 - 5, cy - hs / 8 + 2);
+//    setfillcolor(RGB(150, 100, 80));
+//    solidrectangle(cx - 5, cy - hs / 6, cx + 5, cy + 2);
+//    setlinecolor(RGB(100, 70, 50));
+//    setlinestyle(PS_SOLID, 2);
+//    line(cx - 6, cy + hs / 8, cx + 6, cy + hs / 8);
+//    setfillcolor(RGB(180, 140, 110));
+//    solidrectangle(cx - 8, cy + hs / 5, cx + 8, cy + hs / 4);
+//    setlinestyle(PS_SOLID, 1);
+//
+//    drawShockwaveEffect();
+//    updateShockwaveEffect();
+//
+//    settextcolor(WHITE);
+//    setbkmode(TRANSPARENT);
+//    settextstyle(24, 0, L"微软雅黑");
+//
+//    // 获取当前关卡的最大血量用于显示
+//    int displayMaxHealth;
+//    if (level <= 4) displayMaxHealth = 300;
+//    else if (level == 5) displayMaxHealth = 500;
+//    else displayMaxHealth = 400;
+//
+//    wchar_t infoStr[200];
+//    if (level == 6) {
+//        swprintf(infoStr, 200, L"第 %d 关 | 剩余血量: %d/%d | Boss战无时间限制", level, p.health, displayMaxHealth);
+//    }
+//    else {
+//        swprintf(infoStr, 200, L"第 %d 关 | 剩余血量: %d/%d | 倒计时: %d秒", level, p.health, displayMaxHealth, timeLeft);
+//    }
+//    outtextxy(20, 20, infoStr);
+//
+//    settextcolor(RGB(255, 200, 100));
+//    outtextxy(20, 50, levelDescriptions[level - 1]);
+//
+//    setlinecolor(WHITE);
+//    rectangle(20, 80, 320, 100);
+//
+//    int maxHealth;
+//    if (level <= 4) maxHealth = 300;
+//    else if (level == 5) maxHealth = 500;
+//    else maxHealth = 400;
+//
+//    int healthPercent = p.health * 100 / maxHealth;
+//    if (healthPercent > 60) setfillcolor(GREEN);
+//    else if (healthPercent > 30) setfillcolor(YELLOW);
+//    else setfillcolor(RED);
+//
+//    int barWidth = (int)(p.health * 300.0 / maxHealth);
+//    if (barWidth < 0) barWidth = 0;
+//    solidrectangle(21, 81, 21 + barWidth, 99);
+//
+//    wchar_t healthText[50];
+//    swprintf(healthText, 50, L"%d / %d", p.health, maxHealth);
+//    settextcolor(WHITE);
+//    outtextxy(340, 85, healthText);
+//
+//    if (p.hasShield) {
+//        settextcolor(RGB(255, 255, 0));
+//        wchar_t ss[50];
+//        swprintf(ss, 50, L"护盾剩余: %.1f秒", p.shieldTimer / 60.0f);
+//        outtextxy(450, 80, ss);
+//    }
+//    if (p.isTimeSlowed) {
+//        settextcolor(RGB(255, 200, 0));
+//        wchar_t ss[50];
+//        swprintf(ss, 50, L"减速剩余: %d秒", (TIME_SLOW_DURATION - (GetTickCount() - p.timeSlowStart)) / 1000);
+//        outtextxy(450, 110, ss);
+//    }
+//
+//    if (level == 6 && boss.phaseChanged) {
+//        DWORD el = GetTickCount() - boss.phaseChangeTime;
+//        if (el < 2000) {
+//            settextcolor(RGB(255, 100, 100));
+//            settextstyle(40, 0, L"微软雅黑");
+//            wchar_t pt[100];
+//            if (boss.phase == 1) swprintf(pt, 100, L"Boss进入第二阶段！速度提升！");
+//            else swprintf(pt, 100, L"Boss进入第三阶段！速度暴增！");
+//            int tw = textwidth(pt);
+//            outtextxy(WIDTH / 2 - tw / 2, HEIGHT / 2 - 150, pt);
+//        }
+//        else boss.phaseChanged = false;
+//    }
+//
+//    if (level == 6 && boss.isActive) {
+//        if (p.isFastSwordActive && !isTimeStopped) {
+//            settextcolor(RGB(255, 100, 255));
+//            settextstyle(20, 0, L"微软雅黑");
+//            outtextxy(WIDTH - 280, HEIGHT - 60, L"★ 大剑剑气激活 ★");
+//            settextstyle(16, 0, L"微软雅黑");
+//            settextcolor(RGB(255, 200, 200));
+//            outtextxy(WIDTH - 280, HEIGHT - 35, L"→ 每0.2秒快速发射剑气");
+//        }
+//        else if (p.isAutoSwordActive && !isTimeStopped && !p.isFastSwordActive) {
+//            settextcolor(RGB(255, 100, 255));
+//            settextstyle(20, 0, L"微软雅黑");
+//            outtextxy(WIDTH - 280, HEIGHT - 60, L"★ 自动剑气激活 ★");
+//            settextstyle(16, 0, L"微软雅黑");
+//            settextcolor(RGB(200, 200, 255));
+//            outtextxy(WIDTH - 280, HEIGHT - 35, L"→ 每0.5秒自动发射剑气");
+//        }
+//    }
+//
+//    if (isTimeStopped) {
+//        settextcolor(RGB(255, 100, 100));
+//        settextstyle(30, 0, L"微软雅黑");
+//        outtextxy(WIDTH / 2 - 200, HEIGHT / 2 - 100, L"时停模式！自动发射剑气攻击Boss！");
+//        DWORD el = GetTickCount() - timeStopStart;
+//        wchar_t ts[50];
+//        swprintf(ts, 50, L"剩余时间: %.1f秒", (TIME_STOP_DURATION - el) / 1000.0f);
+//        outtextxy(WIDTH / 2 - 100, HEIGHT / 2 - 60, ts);
+//    }
+//
+//    if (isGlobalSlowed && !isTimeStopped) {
+//        settextcolor(RGB(100, 200, 255));
+//        settextstyle(30, 0, L"微软雅黑");
+//        outtextxy(WIDTH / 2 - 200, HEIGHT / 2 - 100, L"全局减速模式！所有物体速度降低90%！");
+//        DWORD el = GetTickCount() - globalSlowStart;
+//        wchar_t ss[50];
+//        swprintf(ss, 50, L"剩余时间: %.1f秒", (globalSlowDuration - el) / 1000.0f);
+//        outtextxy(WIDTH / 2 - 100, HEIGHT / 2 - 60, ss);
+//    }
+//
+//    settextcolor(RGB(200, 200, 200));
+//    settextstyle(24, 0, L"微软雅黑");
+//    outtextxy(WIDTH - 280, 20, L"操作说明");
+//    settextstyle(20, 0, L"微软雅黑");
+//    outtextxy(WIDTH - 280, 60, L"W  ↑");
+//    outtextxy(WIDTH - 280, 90, L"S  ↓");
+//    outtextxy(WIDTH - 280, 120, L"A  ←");
+//    outtextxy(WIDTH - 280, 150, L"D  →");
+//
+//    if (level >= 3) {
+//        settextcolor(RGB(100, 200, 255));
+//        outtextxy(WIDTH - 280, 200, L"蓝色：护盾");
+//        settextcolor(RGB(100, 255, 100));
+//        outtextxy(WIDTH - 280, 230, L"绿色：血包");
+//    }
+//    if (level == 5) {
+//        settextcolor(RGB(255, 200, 0));
+//        outtextxy(WIDTH - 280, 260, L"黄色：不死图腾");
+//        settextcolor(RGB(200, 200, 200));
+//        settextstyle(16, 0, L"微软雅黑");
+//        outtextxy(WIDTH - 280, 290, L"→ 血量<200时出现 | 场景仅1个");
+//        outtextxy(WIDTH - 280, 310, L"→ 回血60 + 全局减速5秒 + 大范围冲击波");
+//    }
+//    if (level == 6) {
+//        settextcolor(RGB(255, 200, 0));
+//        outtextxy(WIDTH - 280, 260, L"金色：大剑");
+//        settextcolor(RGB(200, 200, 200));
+//        settextstyle(16, 0, L"微软雅黑");
+//        outtextxy(WIDTH - 280, 290, L"→ 每15秒掉落一次");
+//        outtextxy(WIDTH - 280, 310, L"→ 拾取后全局减速5秒 + 冲击波");
+//        outtextxy(WIDTH - 280, 330, L"→ 减速期间快速发射剑气（0.2秒/次）");
+//    }
+//
+//    settextcolor(RGB(150, 150, 150));
+//    settextstyle(18, 0, L"微软雅黑");
+//    outtextxy(20, HEIGHT - 30, L"空格键暂停 | 鼠标右键退出游戏");
+//
+//    FlushBatchDraw();
+//}
+//void drawButton(Button& btn) {
+//    setfillcolor(btn.hover ? RGB(80, 80, 80) : RGB(50, 50, 50));
+//    setlinecolor(btn.hover ? RGB(255, 200, 0) : RGB(200, 200, 200));
+//    solidroundrect(btn.x, btn.y, btn.x + btn.w, btn.y + btn.h, 10, 10);
+//    settextcolor(WHITE);
+//    setbkmode(TRANSPARENT);
+//    settextstyle(28, 0, L"微软雅黑");
+//    int tw = textwidth(btn.text), th = textheight(btn.text);
+//    outtextxy(btn.x + (btn.w - tw) / 2, btn.y + (btn.h - th) / 2, btn.text);
+//}
+//
+//bool checkButtonClick(Button& btn, MOUSEMSG& msg) {
+//    btn.hover = (msg.x >= btn.x && msg.x <= btn.x + btn.w && msg.y >= btn.y && msg.y <= btn.y + btn.h);
+//    if (btn.hover && msg.uMsg == WM_LBUTTONDOWN) { playClickSound(); return true; }
+//    return false;
+//}
+//
+//void drawMainMenu() {
+//    cleardevice();
+//    for (int i = 0; i < HEIGHT; i++) {
+//        setlinecolor(RGB(20, 15, 30 + i * 30 / HEIGHT));
+//        line(0, i, WIDTH, i);
+//    }
+//    for (int i = 0; i < 200; i++) {
+//        setfillcolor(RGB(80, 20, 20));
+//        solidrectangle(0, HEIGHT - 200 + i, WIDTH, HEIGHT - 200 + i + 1);
+//    }
+//    setlinecolor(RGB(40, 35, 50));
+//    setlinestyle(PS_SOLID, 1);
+//    for (int i = 0; i < WIDTH; i += 60) line(i, 0, i, HEIGHT);
+//    for (int i = 0; i < HEIGHT; i += 60) line(0, i, WIDTH, i);
+//
+//    settextcolor(RGB(100, 50, 50));
+//    settextstyle(85, 0, L"微软雅黑");
+//    const wchar_t title[] = L"村民大战僵尸";
+//    int tw = textwidth(title);
+//    for (int off = 3; off >= 1; off--) {
+//        settextcolor(RGB(150 - off * 30, 50 - off * 10, 50 - off * 10));
+//        outtextxy((WIDTH - tw) / 2 - off, HEIGHT / 2 - 200 - off, title);
+//        outtextxy((WIDTH - tw) / 2 + off, HEIGHT / 2 - 200 + off, title);
+//    }
+//    settextcolor(RGB(200, 60, 60));
+//    outtextxy((WIDTH - tw) / 2, HEIGHT / 2 - 200, title);
+//
+//    settextcolor(RGB(150, 100, 100));
+//    settextstyle(28, 0, L"微软雅黑");
+//    const wchar_t sub[] = L"V1.0";
+//    outtextxy((WIDTH - textwidth(sub)) / 2, HEIGHT / 2 - 130, sub);
+//
+//    setlinecolor(RGB(150, 50, 50));
+//    setlinestyle(PS_SOLID, 2);
+//    line(WIDTH / 2 - 200, HEIGHT / 2 - 100, WIDTH / 2 + 200, HEIGHT / 2 - 100);
+//    setlinecolor(RGB(80, 30, 30));
+//    line(WIDTH / 2 - 200, HEIGHT / 2 - 98, WIDTH / 2 + 200, HEIGHT / 2 - 98);
+//
+//    Button btnLevels = { BTN_LEVELS, WIDTH / 2 - 150, HEIGHT / 2 - 70, 300, 55, L"开始游戏", false };
+//    Button btnHelp = { BTN_HELP, WIDTH / 2 - 150, HEIGHT / 2, 300, 55, L"游戏说明", false };
+//    Button btnExit = { BTN_EXIT, WIDTH / 2 - 150, HEIGHT / 2 + 70, 300, 55, L"退出游戏", false };
+//
+//    POINT cursor;
+//    GetCursorPos(&cursor);
+//    ScreenToClient(GetHWnd(), &cursor);
+//
+//    btnLevels.hover = (cursor.x >= btnLevels.x && cursor.x <= btnLevels.x + btnLevels.w && cursor.y >= btnLevels.y && cursor.y <= btnLevels.y + btnLevels.h);
+//    btnHelp.hover = (cursor.x >= btnHelp.x && cursor.x <= btnHelp.x + btnHelp.w && cursor.y >= btnHelp.y && cursor.y <= btnHelp.y + btnHelp.h);
+//    btnExit.hover = (cursor.x >= btnExit.x && cursor.x <= btnExit.x + btnExit.w && cursor.y >= btnExit.y && cursor.y <= btnExit.y + btnExit.h);
+//
+//    if (MouseHit()) {
+//        MOUSEMSG msg = GetMouseMsg();
+//        if (msg.uMsg == WM_LBUTTONDOWN) {
+//            if (btnLevels.hover) { currentMenu = MENU_LEVEL_SELECT; playClickSound(); }
+//            if (btnHelp.hover) { currentMenu = MENU_HELP; playClickSound(); }
+//            if (btnExit.hover) { cleanAudio(); closegraph(); exit(0); }
+//        }
+//    }
+//
+//    Button btns[] = { btnLevels, btnHelp, btnExit };
+//    for (int i = 0; i < 3; i++) {
+//        Button& btn = btns[i];
+//        if (btn.hover) { setfillcolor(RGB(150, 40, 40)); setlinecolor(RGB(255, 100, 100)); }
+//        else { setfillcolor(RGB(40, 25, 35)); setlinecolor(RGB(100, 50, 70)); }
+//        solidroundrect(btn.x, btn.y, btn.x + btn.w, btn.y + btn.h, 15, 15);
+//        setlinecolor(btn.hover ? RGB(255, 150, 150) : RGB(80, 40, 60));
+//        setlinestyle(PS_SOLID, 2);
+//        roundrect(btn.x, btn.y, btn.x + btn.w, btn.y + btn.h, 15, 15);
+//        settextcolor(btn.hover ? RGB(255, 255, 200) : RGB(200, 150, 160));
+//        settextstyle(26, 0, L"微软雅黑");
+//        int tw = textwidth(btn.text), th = textheight(btn.text);
+//        outtextxy(btn.x + (btn.w - tw) / 2, btn.y + (btn.h - th) / 2, btn.text);
+//        if (btn.hover) {
+//            setfillcolor(RGB(255, 100, 100));
+//            solidcircle(btn.x + 10, btn.y + btn.h / 2, 4);
+//            solidcircle(btn.x + btn.w - 10, btn.y + btn.h / 2, 4);
+//        }
+//    }
+//
+//    settextcolor(RGB(80, 50, 60));
+//    settextstyle(14, 0, L"微软雅黑");
+//    outtextxy(WIDTH - 150, HEIGHT - 25, L"© 村民大战僵尸");
+//
+//    setfillcolor(RGB(100, 70, 80));
+//    solidcircle(WIDTH - 80, HEIGHT - 70, 15);
+//    setfillcolor(RGB(0, 0, 0));
+//    solidcircle(WIDTH - 85, HEIGHT - 75, 3);
+//    solidcircle(WIDTH - 75, HEIGHT - 75, 3);
+//    setlinecolor(RGB(0, 0, 0));
+//    line(WIDTH - 85, HEIGHT - 65, WIDTH - 75, HEIGHT - 65);
+//
+//    setlinestyle(PS_SOLID, 1);
+//    FlushBatchDraw();
+//}
+//
+//void drawLevelSelectMenu() {
+//    cleardevice();
+//    for (int i = 0; i < HEIGHT; i++) {
+//        setlinecolor(RGB(15 + i * 20 / HEIGHT, 10 + i * 15 / HEIGHT, 25 + i * 20 / HEIGHT));
+//        line(0, i, WIDTH, i);
+//    }
+//    for (int i = 0; i < 100; i++) {
+//        static int sx[100], sy[100];
+//        static bool inited = false;
+//        if (!inited) { sx[i] = rand() % WIDTH; sy[i] = rand() % (HEIGHT - 150); inited = true; }
+//        putpixel(sx[i], sy[i], RGB(200, 200, 255));
+//    }
+//
+//    // 标题（后绘制文字）
+//    settextcolor(RGB(180, 130, 200));
+//    settextstyle(48, 0, L"微软雅黑");
+//    const wchar_t title[] = L"选择关卡";
+//    int tw = textwidth(title);
+//    outtextxy((WIDTH - tw) / 2, HEIGHT / 2 - 200, title);
+//
+//    Button btn1 = { BTN_LEVEL_1, WIDTH / 2 - 340, HEIGHT / 2 - 100, 80, 65, L"1", false };
+//    Button btn2 = { BTN_LEVEL_2, WIDTH / 2 - 220, HEIGHT / 2 - 100, 80, 65, L"2", false };
+//    Button btn3 = { BTN_LEVEL_3, WIDTH / 2 - 100, HEIGHT / 2 - 100, 80, 65, L"3", false };
+//    Button btn4 = { BTN_LEVEL_4, WIDTH / 2 + 20, HEIGHT / 2 - 100, 80, 65, L"4", false };
+//    Button btn5 = { BTN_LEVEL_5, WIDTH / 2 + 140, HEIGHT / 2 - 100, 80, 65, L"5", false };
+//    Button btn6 = { BTN_LEVEL_6, WIDTH / 2 + 260, HEIGHT / 2 - 100, 80, 65, L"6", false };
+//    Button btnBack = { BTN_BACK, WIDTH / 2 - 150, HEIGHT / 2 + 50, 300, 55, L"返回主菜单", false };
+//
+//    POINT cursor;
+//    GetCursorPos(&cursor);
+//    ScreenToClient(GetHWnd(), &cursor);
+//
+//    btn1.hover = (cursor.x >= btn1.x && cursor.x <= btn1.x + btn1.w && cursor.y >= btn1.y && cursor.y <= btn1.y + btn1.h);
+//    btn2.hover = (cursor.x >= btn2.x && cursor.x <= btn2.x + btn2.w && cursor.y >= btn2.y && cursor.y <= btn2.y + btn2.h);
+//    btn3.hover = (cursor.x >= btn3.x && cursor.x <= btn3.x + btn3.w && cursor.y >= btn3.y && cursor.y <= btn3.y + btn3.h);
+//    btn4.hover = (cursor.x >= btn4.x && cursor.x <= btn4.x + btn4.w && cursor.y >= btn4.y && cursor.y <= btn4.y + btn4.h);
+//    btn5.hover = (cursor.x >= btn5.x && cursor.x <= btn5.x + btn5.w && cursor.y >= btn5.y && cursor.y <= btn5.y + btn5.h);
+//    btn6.hover = (cursor.x >= btn6.x && cursor.x <= btn6.x + btn6.w && cursor.y >= btn6.y && cursor.y <= btn6.y + btn6.h);
+//    btnBack.hover = (cursor.x >= btnBack.x && cursor.x <= btnBack.x + btnBack.w && cursor.y >= btnBack.y && cursor.y <= btnBack.y + btnBack.h);
+//
+//    if (MouseHit()) {
+//        MOUSEMSG msg = GetMouseMsg();
+//        if (msg.uMsg == WM_LBUTTONDOWN) {
+//            if (btn1.hover) { currentLevel = 1; currentMenu = MENU_GAME; playClickSound(); }
+//            if (btn2.hover) { currentLevel = 2; currentMenu = MENU_GAME; playClickSound(); }
+//            if (btn3.hover) { currentLevel = 3; currentMenu = MENU_GAME; playClickSound(); }
+//            if (btn4.hover) { currentLevel = 4; currentMenu = MENU_GAME; playClickSound(); }
+//            if (btn5.hover) { currentLevel = 5; currentMenu = MENU_GAME; playClickSound(); }
+//            if (btn6.hover) { currentLevel = 6; currentMenu = MENU_GAME; playClickSound(); }
+//            if (btnBack.hover) { currentMenu = MENU_MAIN; playMenuBgMusic(); playClickSound(); }
+//        }
+//    }
+//
+//    Button btns[] = { btn1, btn2, btn3, btn4, btn5, btn6, btnBack };
+//    for (int i = 0; i < 7; i++) {
+//        Button& btn = btns[i];
+//        if (btn.type >= BTN_LEVEL_1 && btn.type <= BTN_LEVEL_6) {
+//            if (btn.hover) { setfillcolor(RGB(200, 80, 120)); setlinecolor(RGB(255, 150, 200)); }
+//            else { setfillcolor(RGB(60, 30, 50)); setlinecolor(RGB(120, 60, 100)); }
+//            solidroundrect(btn.x, btn.y, btn.x + btn.w, btn.y + btn.h, 12, 12);
+//            setlinecolor(RGB(180, 100, 140));
+//            setlinestyle(PS_SOLID, 1);
+//            roundrect(btn.x + 2, btn.y + 2, btn.x + btn.w - 2, btn.y + btn.h - 2, 10, 10);
+//            settextcolor(btn.hover ? RGB(255, 255, 200) : RGB(200, 150, 180));
+//        }
+//        else {
+//            if (btn.hover) { setfillcolor(RGB(100, 70, 90)); setlinecolor(RGB(180, 130, 160)); }
+//            else { setfillcolor(RGB(40, 30, 45)); setlinecolor(RGB(80, 60, 80)); }
+//            solidroundrect(btn.x, btn.y, btn.x + btn.w, btn.y + btn.h, 12, 12);
+//            settextcolor(btn.hover ? RGB(220, 200, 220) : RGB(150, 120, 150));
+//        }
+//        setbkmode(TRANSPARENT);
+//        settextstyle(28, 0, L"微软雅黑");
+//        int tw = textwidth(btn.text), th = textheight(btn.text);
+//        outtextxy(btn.x + (btn.w - tw) / 2, btn.y + (btn.h - th) / 2, btn.text);
+//    }
+//
+//    settextcolor(RGB(100, 80, 100));
+//    settextstyle(16, 0, L"微软雅黑");
+//    outtextxy((WIDTH - textwidth(L"点击数字选择关卡")) / 2, HEIGHT - 40, L"点击数字选择关卡");
+//    setlinestyle(PS_SOLID, 1);
+//    FlushBatchDraw();
+//}
+//
+//void drawPauseMenu() {
+//    cleardevice();
+//    for (int i = 0; i < 10; i++) {
+//        setfillcolor(RGB(10, 5, 15));
+//        solidrectangle(0, 0, WIDTH, HEIGHT);
+//    }
+//    for (int i = 0; i < 100; i++) {
+//        setfillcolor(RGB(80, 40, 60));
+//        solidcircle(WIDTH / 2, HEIGHT / 2, 200 - i);
+//    }
+//    setfillcolor(RGB(200, 100, 130));
+//    solidrectangle(WIDTH / 2 - 40, HEIGHT / 2 - 80, WIDTH / 2 - 15, HEIGHT / 2 + 80);
+//    solidrectangle(WIDTH / 2 + 15, HEIGHT / 2 - 80, WIDTH / 2 + 40, HEIGHT / 2 + 80);
+//
+//    settextcolor(RGB(220, 150, 180));
+//    settextstyle(56, 0, L"微软雅黑");
+//    const wchar_t title[] = L"游戏暂停";
+//    outtextxy((WIDTH - textwidth(title)) / 2, HEIGHT / 2 + 100, title);
+//    setlinecolor(RGB(180, 100, 140));
+//    setlinestyle(PS_SOLID, 2);
+//    line(WIDTH / 2 - 150, HEIGHT / 2 + 130, WIDTH / 2 + 150, HEIGHT / 2 + 130);
+//
+//    Button btnContinue = { BTN_CONTINUE, WIDTH / 2 - 150, HEIGHT / 2 + 160, 300, 50, L"继续游戏", false };
+//    Button btnBack = { BTN_BACK, WIDTH / 2 - 150, HEIGHT / 2 + 230, 300, 50, L"返回选关界面", false };
+//
+//    POINT cursor;
+//    GetCursorPos(&cursor);
+//    ScreenToClient(GetHWnd(), &cursor);
+//
+//    btnContinue.hover = (cursor.x >= btnContinue.x && cursor.x <= btnContinue.x + btnContinue.w && cursor.y >= btnContinue.y && cursor.y <= btnContinue.y + btnContinue.h);
+//    btnBack.hover = (cursor.x >= btnBack.x && cursor.x <= btnBack.x + btnBack.w && cursor.y >= btnBack.y && cursor.y <= btnBack.y + btnBack.h);
+//
+//    if (MouseHit()) {
+//        MOUSEMSG msg = GetMouseMsg();
+//        if (msg.uMsg == WM_LBUTTONDOWN) {
+//            if (btnContinue.hover) { isPaused = false; resumeBgMusic(); playClickSound(); return; }
+//            if (btnBack.hover) { stopAllBgMusic(); currentMenu = MENU_LEVEL_SELECT; playMenuBgMusic(); isPaused = false; playClickSound(); return; }
+//        }
+//    }
+//
+//    Button btns[] = { btnContinue, btnBack };
+//    for (int i = 0; i < 2; i++) {
+//        Button& btn = btns[i];
+//        if (btn.hover) { setfillcolor(RGB(180, 80, 110)); setlinecolor(RGB(255, 150, 180)); }
+//        else { setfillcolor(RGB(40, 25, 40)); setlinecolor(RGB(100, 60, 90)); }
+//        solidroundrect(btn.x, btn.y, btn.x + btn.w, btn.y + btn.h, 12, 12);
+//        settextcolor(btn.hover ? RGB(255, 255, 220) : RGB(200, 150, 170));
+//        settextstyle(24, 0, L"微软雅黑");
+//        int tw = textwidth(btn.text), th = textheight(btn.text);
+//        outtextxy(btn.x + (btn.w - tw) / 2, btn.y + (btn.h - th) / 2, btn.text);
+//    }
+//    settextcolor(RGB(100, 70, 90));
+//    settextstyle(14, 0, L"微软雅黑");
+//    outtextxy((WIDTH - textwidth(L"按空格键继续游戏")) / 2, HEIGHT - 30, L"按空格键继续游戏");
+//    setlinestyle(PS_SOLID, 1);
+//    FlushBatchDraw();
+//}
+//void drawLevelCompleteMenu(int level) {
+//    cleardevice();
+//    setbkcolor(BLACK);
+//    settextcolor(GREEN);
+//    settextstyle(56, 0, L"微软雅黑");
+//    outtextxy((WIDTH - textwidth(L"关卡通过！")) / 2, HEIGHT / 2 - 150, L"关卡通过！");
+//    Button btnNext, btnBack;
+//    if (level < 5) {
+//        btnNext = { BTN_NEXT, WIDTH / 2 - 150, HEIGHT / 2 - 10, 300, 60, L"下一关", false };
+//        btnBack = { BTN_BACK, WIDTH / 2 - 150, HEIGHT / 2 + 70, 300, 60, L"返回选关界面", false };
+//    }
+//    else {
+//        btnBack = { BTN_BACK, WIDTH / 2 - 150, HEIGHT / 2 - 10, 300, 60, L"返回选关界面", false };
+//    }
+//    MOUSEMSG msg;
+//    if (MouseHit()) {
+//        msg = GetMouseMsg();
+//        if (level < 5) {
+//            btnNext.hover = (msg.x >= btnNext.x && msg.x <= btnNext.x + btnNext.w && msg.y >= btnNext.y && msg.y <= btnNext.y + btnNext.h);
+//            if (checkButtonClick(btnNext, msg)) { currentLevel = level + 1; currentMenu = MENU_GAME; }
+//        }
+//        btnBack.hover = (msg.x >= btnBack.x && msg.x <= btnBack.x + btnBack.w && msg.y >= btnBack.y && msg.y <= btnBack.y + btnBack.h);
+//        if (checkButtonClick(btnBack, msg)) { currentMenu = MENU_LEVEL_SELECT; playMenuBgMusic(); }
+//    }
+//    if (level < 5) drawButton(btnNext);
+//    drawButton(btnBack);
+//    FlushBatchDraw();
+//}
+//
+//void drawGameOverMenu(int level) {
+//    cleardevice();
+//    setbkcolor(BLACK);
+//    settextcolor(RED);
+//    settextstyle(56, 0, L"微软雅黑");
+//    outtextxy((WIDTH - textwidth(L"游戏失败")) / 2, HEIGHT / 2 - 150, L"游戏失败");
+//    settextcolor(WHITE);
+//    wchar_t ls[100];
+//    swprintf(ls, 100, L"止步于: 第 %d 关", level);
+//    outtextxy((WIDTH - textwidth(ls)) / 2, HEIGHT / 2 - 20, ls);
+//    Button btnRestart = { BTN_RESTART, WIDTH / 2 - 150, HEIGHT / 2 + 50, 300, 60, L"重新开始本关", false };
+//    Button btnBack = { BTN_BACK, WIDTH / 2 - 150, HEIGHT / 2 + 130, 300, 60, L"返回选关界面", false };
+//    MOUSEMSG msg;
+//    if (MouseHit()) {
+//        msg = GetMouseMsg();
+//        btnRestart.hover = (msg.x >= btnRestart.x && msg.x <= btnRestart.x + btnRestart.w && msg.y >= btnRestart.y && msg.y <= btnRestart.y + btnRestart.h);
+//        if (checkButtonClick(btnRestart, msg)) { currentMenu = MENU_GAME; }
+//        btnBack.hover = (msg.x >= btnBack.x && msg.x <= btnBack.x + btnBack.w && msg.y >= btnBack.y && msg.y <= btnBack.y + btnBack.h);
+//        if (checkButtonClick(btnBack, msg)) { currentMenu = MENU_LEVEL_SELECT; playMenuBgMusic(); }
+//    }
+//    drawButton(btnRestart);
+//    drawButton(btnBack);
+//    FlushBatchDraw();
+//}
+//
+//void drawGameCompleteMenu() {
+//    cleardevice();
+//    setbkcolor(BLACK);
+//    settextcolor(RGB(255, 215, 0));
+//    settextstyle(64, 0, L"微软雅黑");
+//    outtextxy((WIDTH - textwidth(L"恭喜通关！")) / 2, HEIGHT / 2 - 150, L"恭喜通关！");
+//    Button btnBack = { BTN_BACK, WIDTH / 2 - 150, HEIGHT / 2 + 20, 300, 60, L"返回选关界面", false };
+//    MOUSEMSG msg;
+//    if (MouseHit()) {
+//        msg = GetMouseMsg();
+//        btnBack.hover = (msg.x >= btnBack.x && msg.x <= btnBack.x + btnBack.w && msg.y >= btnBack.y && msg.y <= btnBack.y + btnBack.h);
+//        if (checkButtonClick(btnBack, msg)) { currentMenu = MENU_LEVEL_SELECT; playMenuBgMusic(); }
+//    }
+//    drawButton(btnBack);
+//    FlushBatchDraw();
+//}
+//
+//void drawHelpMenu() {
+//    cleardevice();
+//    setbkcolor(RGB(30, 30, 40));
+//    cleardevice();
+//
+//    settextcolor(RGB(255, 215, 0));
+//    settextstyle(48, 0, L"微软雅黑");
+//    outtextxy((WIDTH - textwidth(L"游戏说明")) / 2, 15, L"游戏说明");
+//
+//    settextcolor(RGB(100, 200, 255));
+//    settextstyle(26, 0, L"微软雅黑");
+//    outtextxy(30, 75, L"【玩家参数】");
+//    settextcolor(RGB(220, 220, 220));
+//    settextstyle(18, 0, L"微软雅黑");
+//    // ========== 玩家参数 ==========
+//    settextcolor(RGB(100, 200, 255));
+//    settextstyle(26, 0, L"微软雅黑");
+//    outtextxy(30, 75, L"【玩家参数】");
+//
+//    settextcolor(RGB(220, 220, 220));
+//    settextstyle(18, 0, L"微软雅黑");
+//    outtextxy(30, 110, L"初始血量：第1-4关 300，第5关 500，第6关 400");
+//    outtextxy(30, 135, L"移动速度：20像素/帧");
+//    outtextxy(30, 160, L"碰撞伤害：10点（有护盾时无敌）");
+//    outtextxy(30, 185, L"护盾持续时间：3秒");
+//    outtextxy(30, 210, L"受伤冷却：200毫秒");
+//    outtextxy(30, 135, L"移动速度：20像素/帧");
+//    outtextxy(30, 160, L"碰撞伤害：10点（有护盾时无敌）");
+//    outtextxy(30, 185, L"护盾持续时间：3秒");
+//    outtextxy(30, 210, L"受伤冷却：200毫秒");
+//
+//    settextcolor(RGB(100, 200, 255));
+//    settextstyle(26, 0, L"微软雅黑");
+//    outtextxy(30, 255, L"【道具参数】");
+//    settextcolor(RGB(100, 255, 100));
+//    settextstyle(18, 0, L"微软雅黑");
+//    outtextxy(30, 290, L"❤️ 血包");
+//    settextcolor(RGB(220, 220, 220));
+//    outtextxy(130, 290, L"回复20点生命值");
+//    settextcolor(RGB(100, 100, 255));
+//    outtextxy(30, 318, L"💙 护盾");
+//    settextcolor(RGB(220, 220, 220));
+//    outtextxy(130, 318, L"获得3秒无敌护盾");
+//    settextcolor(RGB(255, 200, 0));
+//    outtextxy(30, 346, L"✨ 不死图腾");
+//    settextcolor(RGB(220, 220, 220));
+//    outtextxy(160, 346, L"回复60点生命值（最高150）+ 全局减速5秒 + 冲击波");
+//    outtextxy(160, 371, L"生成条件：第4关血量<70，第5-6关血量≤150");
+//    settextcolor(RGB(255, 100, 100));
+//    outtextxy(30, 400, L"⚔️ 大剑");
+//    settextcolor(RGB(220, 220, 220));
+//    outtextxy(130, 400, L"全局减速5秒 + 冲击波 + 快速剑气（0.2秒/次）");
+//    outtextxy(130, 425, L"生成条件：第6关Boss战，每15秒掉落一次");
+//
+//    settextcolor(RGB(200, 100, 255));
+//    settextstyle(26, 0, L"微软雅黑");
+//    outtextxy(30, 470, L"【Boss参数（第6关）】");
+//    settextcolor(RGB(220, 220, 220));
+//    settextstyle(18, 0, L"微软雅黑");
+//    outtextxy(30, 505, L"初始血量：500");
+//    outtextxy(30, 530, L"攻击间隔：第一阶段600ms，第二阶段380ms，第三阶段200ms");
+//    outtextxy(30, 555, L"移动速度：第一阶段5，第二阶段9，第三阶段12");
+//    outtextxy(30, 580, L"阶段变化：血量≤66%进入第二阶段，血量≤33%进入第三阶段");
+//    outtextxy(30, 605, L"第三阶段效果：玩家获得自动剑气（0.5秒/次）");
+//
+//    settextcolor(RGB(255, 200, 100));
+//    settextstyle(26, 0, L"微软雅黑");
+//    outtextxy(WIDTH / 2 + 20, 75, L"【关卡参数】");
+//    settextcolor(RGB(220, 220, 220));
+//    settextstyle(16, 0, L"微软雅黑");
+//    outtextxy(WIDTH / 2 + 20, 115, L"关卡   速度   最大数量   生成频率   大小   道具%   图腾%");
+//    outtextxy(WIDTH / 2 + 20, 140, L"------------------------------------------------------");
+//    outtextxy(WIDTH / 2 + 20, 165, L" 1       8        50         6帧       35      3%       0%");
+//    outtextxy(WIDTH / 2 + 20, 190, L" 2      12        70         5帧       32      5%       0%");
+//    outtextxy(WIDTH / 2 + 20, 215, L" 3      15        90         4帧       30      8%       0%");
+//    outtextxy(WIDTH / 2 + 20, 240, L" 4      18       100         3帧       28     12%       5%");
+//    outtextxy(WIDTH / 2 + 20, 265, L" 5      20       120         2帧       25     15%       2%");
+//    outtextxy(WIDTH / 2 + 20, 290, L" 6       8        80         8帧       25     30%       6%   (Boss战)");
+//
+//    settextcolor(RGB(255, 200, 100));
+//    settextstyle(26, 0, L"微软雅黑");
+//    outtextxy(WIDTH / 2 + 20, 335, L"【怪物说明】");
+//    settextcolor(RGB(220, 220, 220));
+//    settextstyle(18, 0, L"微软雅黑");
+//    outtextxy(WIDTH / 2 + 20, 370, L"僵尸头部：绿色方形，碰撞造成10点伤害");
+//    outtextxy(WIDTH / 2 + 20, 398, L"骷髅头部：白色方形，碰撞造成10点伤害");
+//    outtextxy(WIDTH / 2 + 20, 426, L"          20%几率在生成0.3秒后射箭，箭矢造成5点伤害");
+//
+//    settextcolor(RGB(255, 200, 100));
+//    settextstyle(26, 0, L"微软雅黑");
+//    outtextxy(WIDTH / 2 + 20, 475, L"【剑气系统】");
+//    settextcolor(RGB(220, 220, 220));
+//    settextstyle(18, 0, L"微软雅黑");
+//    outtextxy(WIDTH / 2 + 20, 510, L"自动剑气（第三阶段）：每0.5秒发射3束剑气");
+//    outtextxy(WIDTH / 2 + 20, 538, L"大剑剑气（减速期间）：每0.2秒发射3束剑气");
+//    outtextxy(WIDTH / 2 + 20, 566, L"剑气伤害：对Boss造成1点伤害，可清除障碍物");
+//
+//    Button btnBack = { BTN_HELP_BACK, WIDTH / 2 - 100, HEIGHT - 55, 200, 50, L"返回主菜单", false };
+//    POINT cursor;
+//    GetCursorPos(&cursor);
+//    ScreenToClient(GetHWnd(), &cursor);
+//    btnBack.hover = (cursor.x >= btnBack.x && cursor.x <= btnBack.x + btnBack.w && cursor.y >= btnBack.y && cursor.y <= btnBack.y + btnBack.h);
+//    if (MouseHit()) {
+//        MOUSEMSG msg = GetMouseMsg();
+//        if (msg.uMsg == WM_LBUTTONDOWN && btnBack.hover) {
+//            currentMenu = MENU_MAIN;
+//            playMenuBgMusic();
+//            playClickSound();
+//        }
+//    }
+//    drawButton(btnBack);
+//    FlushBatchDraw();
+//}
+//
+//void showLevelStart(int level) {
+//    cleardevice();
+//    setbkcolor(BLACK);
+//    settextcolor(RGB(255, 215, 0));
+//    settextstyle(56, 0, L"微软雅黑");
+//    wchar_t ls[50];
+//    swprintf(ls, 50, L"第 %d 关", level);
+//    int tw = textwidth(ls);
+//    outtextxy((WIDTH - tw) / 2, HEIGHT / 2 - 100, ls);
+//    settextstyle(36, 0, L"微软雅黑");
+//    settextcolor(RGB(200, 200, 255));
+//    tw = textwidth(levelDescriptions[level - 1]);
+//    outtextxy((WIDTH - tw) / 2, HEIGHT / 2, levelDescriptions[level - 1]);
+//    settextstyle(28, 0, L"微软雅黑");
+//    settextcolor(WHITE);
+//    LevelConfig& cfg = levels[level - 1];
+//    wchar_t ds[200];
+//    if (level == 6) swprintf(ds, 200, L"Boss战 | 击败Boss胜利 | 大剑掉落攻击");
+//    else if (level == 5) swprintf(ds, 200, L"超高密度障碍物 | 图腾仅血量<200时出现 | 最大数量: %d", cfg.maxObstacles);
+//    else swprintf(ds, 200, L"速度: %d  最大数量: %d  障碍大小: %dpx", cfg.baseSpeed, cfg.maxObstacles, cfg.obstacleSize);
+//    tw = textwidth(ds);
+//    outtextxy((WIDTH - tw) / 2, HEIGHT / 2 + 60, ds);
+//    if (level == 6) {
+//        settextcolor(RGB(255, 200, 0));
+//        wchar_t tip[] = L"本关为Boss战！击败Boss即可通关！";
+//        tw = textwidth(tip);
+//        outtextxy((WIDTH - tw) / 2, HEIGHT / 2 + 100, tip);
+//    }
+//    else if (level == 5) {
+//        settextcolor(RGB(255, 200, 0));
+//        wchar_t tip[] = L"本关出现不死图腾（血量<200时生成）！";
+//        tw = textwidth(tip);
+//        outtextxy((WIDTH - tw) / 2, HEIGHT / 2 + 100, tip);
+//    }
+//    else if (cfg.allowPowerUps) {
+//        settextcolor(GREEN);
+//        wchar_t tip[] = L"本关出现道具（血包/护盾）！";
+//        tw = textwidth(tip);
+//        outtextxy((WIDTH - tw) / 2, HEIGHT / 2 + 100, tip);
+//    }
+//    settextcolor(RGB(150, 150, 150));
+//    wchar_t tip[] = L"点击鼠标左键开始 | 右键退出";
+//    tw = textwidth(tip);
+//    outtextxy((WIDTH - tw) / 2, HEIGHT / 2 + 160, tip);
+//    FlushBatchDraw();
+//    while (true) {
+//        MOUSEMSG msg = GetMouseMsg();
+//        if (msg.uMsg == WM_LBUTTONDOWN) { playLevelBgMusic(level); break; }
+//        if (msg.uMsg == WM_RBUTTONDOWN) { cleanAudio(); closegraph(); exit(0); }
+//    }
+//}
+//
+//// ==================== 主函数 ====================
+//int main() {
+//    char cwd[1024];
+//    if (_getcwd(cwd, sizeof(cwd)) != NULL) {
+//        printf("当前程序运行目录: %s\n", cwd);
+//        printf("请在此目录下创建 audio 文件夹并放入音频文件\n\n");
+//    }
+//    initAudio();
+//    initgraph(WIDTH, HEIGHT);
+//    SetWindowText(GetHWnd(), L"村民大战僵尸");
+//    BeginBatchDraw();
+//    setbkcolor(BLACK);
+//    cleardevice();
+//    srand((unsigned)time(NULL));
+//    playMenuBgMusic();
+//
+//    while (true) {
+//        switch (currentMenu) {
+//        case MENU_MAIN:
+//            drawMainMenu();
+//            break;
+//        case MENU_LEVEL_SELECT:
+//            drawLevelSelectMenu();
+//            break;
+//        case MENU_HELP:
+//            drawHelpMenu();
+//            break;
+//        case MENU_GAME: {
+//            showLevelStart(currentLevel);
+//            LevelConfig& cfg = levels[currentLevel - 1];
+//            Player player = initPlayer();
+//            std::list<Obstacle> obstacles;
+//            std::list<PowerUp> powerUps;
+//
+//            int frameCount = 0;
+//            int timeLeft = 80;
+//            clock_t lastTime = clock();
+//            int spawnCounter = 0;
+//            isTotemActive = false;
+//
+//            bool levelComplete = false;
+//            bool gameOver = false;
+//            bool exitToMenu = false;
+//
+//            isGlobalSlowed = false;
+//
+//            if (currentLevel == 6) {
+//                initBoss();
+//            }
+//
+//            while (!levelComplete && !gameOver && !exitToMenu) {
+//                if (GetAsyncKeyState(VK_SPACE) & 0x8000) {
+//                    Sleep(200);
+//                    isPaused = !isPaused;
+//                    if (isPaused) pauseBgMusic();
+//                    else resumeBgMusic();
+//                }
+//                if (isPaused) {
+//                    drawPauseMenu();
+//                    if (currentMenu != MENU_GAME) { exitToMenu = true; break; }
+//                    continue;
+//                }
+//
+//                if (isGlobalSlowed) {
+//                    DWORD elapsed = GetTickCount() - globalSlowStart;
+//                    DWORD now = GetTickCount();
+//                    if (now - player.lastPulseShockwaveTime >= SHOCKWAVE_PULSE_INTERVAL) {
+//                        int shockwaveType = player.isFastSwordActive ? 2 : 1;
+//                        triggerShockwave(player, obstacles, shockwaveType);
+//                        player.lastPulseShockwaveTime = now;
+//                    }
+//                    if (elapsed >= globalSlowDuration) {
+//                        isGlobalSlowed = false;
+//                        applyGlobalSlow(obstacles, powerUps, false);
+//                    }
+//                }
+//
+//                if (currentLevel == 6 && boss.isActive) {
+//                    checkBossPhase(player);
+//                    DWORD now = GetTickCount();
+//                    if (player.isFastSwordActive && boss.isActive) {
+//                        if (now - player.lastFastSwordTime >= player.fastSwordInterval) {
+//                            shootSwordProjectile(player);
+//                            player.lastFastSwordTime = now;
+//                        }
+//                        if (now >= player.fastSwordEndTime) player.isFastSwordActive = false;
+//                    }
+//                    else if (player.isAutoSwordActive && boss.isActive) {
+//                        if (now - player.lastAutoSwordTime >= player.autoSwordInterval) {
+//                            shootSwordProjectile(player);
+//                            player.lastAutoSwordTime = now;
+//                        }
+//                    }
+//                    if (!isGlobalSlowed) {
+//                        updateBossMovement();
+//                        updateBossAttack(obstacles, player);
+//                        dropSwordPowerUp();
+//                        handleSwordPickup(player, obstacles, powerUps);
+//                    }
+//                    else {
+//                        updateBossMovement();
+//                        updateBossAttack(obstacles, player);
+//                        dropSwordPowerUp();
+//                        handleSwordPickup(player, obstacles, powerUps);
+//                    }
+//                    if (boss.health <= 0 && boss.isActive) {
+//                        boss.isActive = false;
+//                        levelComplete = true;
+//                        stopAllBgMusic();
+//                        player.isAutoSwordActive = false;
+//                        player.isFastSwordActive = false;
+//                        if (currentLevel == 6) {
+//                            currentMenu = MENU_GAME_COMPLETE;
+//                            playGameWinMusic();
+//                        }
+//                    }
+//                }
+//
+//                if (currentLevel == 6) updateSwordProjectiles(player, obstacles, boss);
+//
+//                if (player.isTimeSlowed) {
+//                    DWORD elapsed = GetTickCount() - player.timeSlowStart;
+//                    if (player.shockwaveCount == 0 && elapsed >= 0) { triggerShockwave(player, obstacles, 0); player.shockwaveCount = 1; }
+//                    else if (player.shockwaveCount == 1 && elapsed >= SHOCKWAVE_INTERVAL) { triggerShockwave(player, obstacles, 0); player.shockwaveCount = 2; }
+//                    else if (player.shockwaveCount == 2 && elapsed >= 2 * SHOCKWAVE_INTERVAL) { triggerShockwave(player, obstacles, 0); player.shockwaveCount = 3; }
+//                    if (elapsed >= TIME_SLOW_DURATION) { player.isTimeSlowed = false; applyTimeSlow(obstacles, false); }
+//                    player.isMovingUp = (GetAsyncKeyState('W') & 0x8000) != 0;
+//                    player.isMovingDown = (GetAsyncKeyState('S') & 0x8000) != 0;
+//                    player.isMovingLeft = (GetAsyncKeyState('A') & 0x8000) != 0;
+//                    player.isMovingRight = (GetAsyncKeyState('D') & 0x8000) != 0;
+//                    if (player.isMovingLeft) { player.x -= MOVE_SPEED; if (player.x < 0) player.x = 0; }
+//                    if (player.isMovingRight) { player.x += MOVE_SPEED; if (player.x > WIDTH - PLAYER_SIZE) player.x = WIDTH - PLAYER_SIZE; }
+//                    if (player.isMovingUp) { player.y -= MOVE_SPEED; if (player.y < 0) player.y = 0; }
+//                    if (player.isMovingDown) { player.y += MOVE_SPEED; if (player.y > HEIGHT - PLAYER_SIZE - 20) player.y = HEIGHT - PLAYER_SIZE - 20; }
+//                    if (player.isColorful) {
+//                        if (GetTickCount() - player.colorStart >= PLAYER_COLOR_DURATION) player.isColorful = false;
+//                    }
+//                    drawGame(player, obstacles, powerUps, currentLevel, timeLeft, frameCount, cfg);
+//                    Sleep(16);
+//                    continue;
+//                }
+//
+//                frameCount++;
+//                spawnCounter++;
+//                clock_t ct = clock();
+//                if (ct - lastTime >= CLOCKS_PER_SEC) {
+//                    if (currentLevel != 6) timeLeft--;
+//                    lastTime = ct;
+//                }
+//
+//                if (player.hasShield) {
+//                    player.shieldTimer--;
+//                    if (player.shieldTimer <= 0) player.hasShield = false;
+//                }
+//                if (player.isColorful) {
+//                    if (GetTickCount() - player.colorStart >= PLAYER_COLOR_DURATION) player.isColorful = false;
+//                }
+//
+//                player.isMovingUp = (GetAsyncKeyState('W') & 0x8000) != 0;
+//                player.isMovingDown = (GetAsyncKeyState('S') & 0x8000) != 0;
+//                player.isMovingLeft = (GetAsyncKeyState('A') & 0x8000) != 0;
+//                player.isMovingRight = (GetAsyncKeyState('D') & 0x8000) != 0;
+//                if (player.isMovingLeft) { player.x -= MOVE_SPEED; if (player.x < 0) player.x = 0; }
+//                if (player.isMovingRight) { player.x += MOVE_SPEED; if (player.x > WIDTH - PLAYER_SIZE) player.x = WIDTH - PLAYER_SIZE; }
+//                if (player.isMovingUp) { player.y -= MOVE_SPEED; if (player.y < 0) player.y = 0; }
+//                if (player.isMovingDown) { player.y += MOVE_SPEED; if (player.y > HEIGHT - PLAYER_SIZE - 20) player.y = HEIGHT - PLAYER_SIZE - 20; }
+//
+//                if (!isTimeStopped) {
+//                    if (obstacles.size() < cfg.maxObstacles && spawnCounter >= cfg.spawnRate) {
+//                        Obstacle obs = createObstacle(cfg.baseSpeed, cfg.obstacleSize);
+//                        if (currentLevel == 6 && boss.isActive) {
+//                            int bs = boss.phaseObstacleSpeed[boss.phase];
+//                            obs.speed = bs + rand() % 3;
+//                            obs.originalSpeed = obs.speed;
+//                            if (isGlobalSlowed) {
+//                                obs.speed = (int)(obs.originalSpeed * TIME_SLOW_GLOBAL_FACTOR);
+//                                if (obs.speed < 1) obs.speed = 1;
+//                            }
+//                        }
+//                        obstacles.push_back(obs);
+//                        spawnCounter = 0;
+//                    }
+//                }
+//
+//                if (cfg.allowPowerUps && powerUps.size() < (currentLevel >= 5 ? 2 : 3)) {
+//                    if (rand() % 100 < cfg.powerUpChance) {
+//                        PowerUpType type = (rand() % 2 == 0) ? POWERUP_SHIELD : POWERUP_HEALTH;
+//                        powerUps.push_back(createPowerUp(cfg.baseSpeed, type, player.health, currentLevel));
+//                    }
+//                    if (cfg.totemChance > 0) {
+//                        if (currentLevel == 5 || currentLevel == 6) {
+//                            if (player.health <= 150 && !isTotemActive && rand() % 100 < cfg.totemChance) {
+//                                powerUps.push_back(createPowerUp(cfg.baseSpeed, POWERUP_TOTEM, player.health, currentLevel));
+//                            }
+//                        }
+//                        else {
+//                            if (player.health < 70 && !isTotemActive && rand() % 100 < cfg.totemChance) {
+//                                powerUps.push_back(createPowerUp(cfg.baseSpeed, POWERUP_TOTEM, player.health, currentLevel));
+//                            }
+//                        }
+//                    }
+//                }
+//
+//                DWORD now = GetTickCount();
+//                for (auto& obs : obstacles) {
+//                    if (obs.type == 1 && !obs.hasArrow && (now - obs.spawnTime) >= 300) {
+//                        if (rand() % 100 < 20) {
+//                            obs.hasArrow = true;
+//                            Arrow arrow = { obs.x + obs.size / 2 - 4, obs.y + obs.size / 2, obs.speed + 3, 6, true, now, true };
+//                            arrows.push_back(arrow);
+//                        }
+//                    }
+//                }
+//
+//                for (auto it = arrows.begin(); it != arrows.end();) {
+//                    if (!it->active) { it = arrows.erase(it); continue; }
+//                    it->y += it->speed;
+//                    if (it->y > HEIGHT || it->y + it->size < 0) { it = arrows.erase(it); continue; }
+//                    if (player.x < it->x + it->size && player.x + PLAYER_SIZE > it->x &&
+//                        player.y < it->y + it->size && player.y + PLAYER_SIZE > it->y) {
+//                        if (!player.hasShield) {
+//                            DWORD nt = GetTickCount();
+//                            if (nt - lastHurtTime >= HURT_COOLDOWN) {
+//                                player.health -= 5;
+//                                if (player.health < 0) player.health = 0;
+//                                playPlayerHurtSound();
+//                                lastHurtTime = nt;
+//                            }
+//                        }
+//                        it = arrows.erase(it);
+//                        continue;
+//                    }
+//                    ++it;
+//                }
+//
+//                for (auto it = obstacles.begin(); it != obstacles.end();) {
+//                    if (!it->active) { it = obstacles.erase(it); continue; }
+//                    it->y += it->speed;
+//                    if (player.x < it->x + it->size && player.x + PLAYER_SIZE > it->x &&
+//                        player.y < it->y + it->size && player.y + PLAYER_SIZE > it->y) {
+//                        if (!player.hasShield) {
+//                            DWORD nt = GetTickCount();
+//                            if (nt - lastHurtTime >= HURT_COOLDOWN) {
+//                                player.health -= 10;
+//                                if (player.health < 0) player.health = 0;
+//                                playPlayerHurtSound();
+//                                lastHurtTime = nt;
+//                            }
+//                        }
+//                        else {
+//                            player.hasShield = false;
+//                        }
+//                        it->active = false;
+//                    }
+//                    if (it->y > HEIGHT) it->active = false;
+//                    ++it;
+//                }
+//
+//                for (auto it = powerUps.begin(); it != powerUps.end();) {
+//                    if (!it->active) {
+//                        if (it->type == POWERUP_TOTEM) isTotemActive = false;
+//                        it = powerUps.erase(it);
+//                        continue;
+//                    }
+//                    it->y += it->speed;
+//                    int sz = (it->type == POWERUP_TOTEM) ? TOTEM_SIZE : POWERUP_SIZE;
+//                    if (player.x < it->x + sz && player.x + PLAYER_SIZE > it->x &&
+//                        player.y < it->y + sz && player.y + PLAYER_SIZE > it->y) {
+//                        if (it->type == POWERUP_SHIELD) {
+//                            player.hasShield = true;
+//                            player.shieldTimer = 180;
+//                        }
+//                        else if (it->type == POWERUP_HEALTH) {
+//                            // 根据关卡确定血量上限
+//                            int maxHealthLimit;
+//                            if (currentLevel <= 4) {
+//                                maxHealthLimit = 300;
+//                            }
+//                            else if (currentLevel == 5) {
+//                                maxHealthLimit = 500;
+//                            }
+//                            else {
+//                                maxHealthLimit = 400;
+//                            }
+//                            player.health += 20;
+//                            if (player.health > maxHealthLimit) player.health = maxHealthLimit;
+//                        }
+//                        else if (it->type == POWERUP_TOTEM) {
+//                            player.health += 60;
+//                            if (player.health > 150) player.health = 150;  // 图腾最高只到150
+//                            isGlobalSlowed = true;
+//                            globalSlowStart = GetTickCount();
+//                            player.isColorful = true;
+//                            player.colorStart = GetTickCount();
+//                            triggerShockwave(player, obstacles, 1);
+//                            applyGlobalSlow(obstacles, powerUps, true);
+//                            isTotemActive = false;
+//                            playPickTotemSound();
+//                        }
+//                        it->active = false;
+//                    }
+//                    if (it->y > HEIGHT) {
+//                        if (it->type == POWERUP_TOTEM) isTotemActive = false;
+//                        it->active = false;
+//                    }
+//                    ++it;
+//                }
+//
+//                drawGame(player, obstacles, powerUps, currentLevel, timeLeft, frameCount, cfg);
+//                Sleep(16);
+//
+//                if (MouseHit()) {
+//                    MOUSEMSG msg = GetMouseMsg();
+//                    if (msg.uMsg == WM_RBUTTONDOWN) { cleanAudio(); closegraph(); return 0; }
+//                }
+//
+//                if (player.health <= 0) {
+//                    gameOver = true;
+//                    currentMenu = MENU_GAME_OVER;
+//                    stopAllBgMusic();
+//                    playPlayerDeathMusic();
+//                    player.isAutoSwordActive = false;
+//                    player.isFastSwordActive = false;
+//                }
+//                else if (timeLeft <= 0 && currentLevel != 6) {
+//                    levelComplete = true;
+//                    stopAllBgMusic();
+//                    if (currentLevel == 5) {
+//                        currentMenu = MENU_GAME_COMPLETE;
+//                        playGameWinMusic();
+//                    }
+//                    else {
+//                        currentMenu = MENU_LEVEL_COMPLETE;
+//                        playLevelWinMusic();
+//                    }
+//                }
+//            }
+//
+//            if (!exitToMenu) {
+//                if (gameOver) drawGameOverMenu(currentLevel);
+//                else if (levelComplete && currentLevel == 5) drawGameCompleteMenu();
+//                else if (levelComplete && currentLevel == 6) drawGameCompleteMenu();
+//                else if (levelComplete) drawLevelCompleteMenu(currentLevel);
+//            }
+//            break;
+//        }
+//        case MENU_PAUSE:
+//            drawPauseMenu();
+//            break;
+//        case MENU_LEVEL_COMPLETE:
+//            drawLevelCompleteMenu(currentLevel);
+//            break;
+//        case MENU_GAME_OVER:
+//            drawGameOverMenu(currentLevel);
+//            break;
+//        case MENU_GAME_COMPLETE:
+//            drawGameCompleteMenu();
+//            break;
+//        }
+//    }
+//    cleanAudio();
+//    closegraph();
+//    return 0;
+//}
