@@ -1,0 +1,666 @@
+#include <graphics.h>
+#include <conio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <string>
+#include <list>
+#include <mmsystem.h>
+#pragma comment(lib, "winmm.lib")
+
+// ==================== 常量定义 ====================
+const int WIDTH = 1200;
+const int HEIGHT = 800;
+const int PLAYER_SIZE = 45;
+const int POWERUP_SIZE = 30;
+
+// 移动速度
+const int MOVE_SPEED = 25;
+const int RISE_SPEED = 15;
+const int FALL_SPEED = 10;
+
+// 道具类型
+enum PowerUpType {
+    POWERUP_NONE,
+    POWERUP_SHIELD,
+    POWERUP_HEALTH
+};
+
+// ==================== 结构体定义 ====================
+struct Player {
+    int x, y;
+    int health;
+    bool hasShield;
+    int shieldTimer;
+    bool isMovingUp;
+    bool isMovingDown;
+    bool isMovingLeft;
+    bool isMovingRight;
+};
+
+struct Obstacle {
+    int x, y;
+    int speed;
+    int size;
+    bool active;
+};
+
+struct PowerUp {
+    int x, y;
+    int speed;
+    PowerUpType type;
+    bool active;
+};
+
+// 关卡配置结构
+struct LevelConfig {
+    int baseSpeed;
+    int maxObstacles;
+    int spawnRate;
+    int obstacleSize;
+    bool allowPowerUps;
+    int powerUpChance;
+};
+
+// ==================== 五关地狱难度配置（核心修改：大幅提升baseSpeed） ====================
+LevelConfig levels[5] = {
+    {15,  30, 8, 35, false, 0},   // 第1关：maxObstacles 18→30，spawnRate 15→8
+    {22, 45, 6, 32, false, 0},   // 第2关：maxObstacles 25→45，spawnRate 12→6
+    {30, 60, 4, 30, true,  8},   // 第3关：maxObstacles 35→60，spawnRate 10→4
+    {38, 75, 3, 28, true,  12},  // 第4关：maxObstacles 45→75，spawnRate 8→3
+    {48, 90, 2,  25, true,  15}   // 第5关：maxObstacles 55→90，spawnRate 6→2
+};
+
+// 关卡描述
+const wchar_t* levelDescriptions[5] = {
+    L"第一关",
+    L"第二关",
+    L"第三关",
+    L"第四关",
+    L"第五关"
+};
+bool isPaused = false;
+
+// ==================== 函数声明 ====================
+Player initPlayer();
+Obstacle createObstacle(int baseSpeed, int size);
+PowerUp createPowerUp(int baseSpeed, PowerUpType type);
+void drawGame(Player& p, std::list<Obstacle>& obstacles,
+    std::list<PowerUp>& powerUps, int score, int level,
+    int timeLeft, int frameCount, LevelConfig& cfg);
+void showLevelStart(int level);
+void showLevelComplete(int level, int score);
+void showGameOver(int score, int level);
+void showGameComplete(int score);
+
+// ==================== 函数实现 ====================
+
+// 初始化玩家
+Player initPlayer() {
+    Player p;
+    p.x = WIDTH / 2 - PLAYER_SIZE / 2;
+    p.y = HEIGHT - PLAYER_SIZE - 20;
+    p.health = 100;
+    p.hasShield = false;
+    p.shieldTimer = 0;
+    p.isMovingUp = false;
+    p.isMovingDown = false;
+    p.isMovingLeft = false;
+    p.isMovingRight = false;
+    return p;
+}
+
+// 生成障碍物（核心修改：提升随机速度波动范围，让障碍速度更不稳定）
+Obstacle createObstacle(int baseSpeed, int size) {
+    Obstacle o;
+    o.x = rand() % (WIDTH - size);
+    o.y = -size - rand() % 200;
+    // 原：baseSpeed + (rand() %5 -2) → 改为 ±5，且最低速度提升
+    o.speed = baseSpeed + (rand() % 11 - 5);  // 速度波动±5（原±2）
+    if (o.speed < baseSpeed - 3) o.speed = baseSpeed - 3;  // 最低不低于基准-3（原3）
+    o.size = size;
+    o.active = true;
+    return o;
+}
+
+// 生成道具（同步提升道具速度，避免道具太容易获取）
+PowerUp createPowerUp(int baseSpeed, PowerUpType type) {
+    PowerUp p;
+    p.x = rand() % (WIDTH - POWERUP_SIZE);
+    p.y = -POWERUP_SIZE - rand() % 300;
+    p.speed = baseSpeed - 5;  // 原-2→-5（道具下落更快）
+    if (p.speed < 5) p.speed = 5;  // 原2→5（最低速度提升）
+    p.type = type;
+    p.active = true;
+    return p;
+}
+
+// 绘制游戏画面
+void drawGame(Player& p, std::list<Obstacle>& obstacles,
+    std::list<PowerUp>& powerUps, int score, int level,
+    int timeLeft, int frameCount, LevelConfig& cfg) {
+    BeginBatchDraw();
+    cleardevice();
+
+    // 绘制网格背景
+    setlinecolor(RGB(30, 30, 30));
+    for (int i = 0; i < WIDTH; i += 50) {
+        line(i, 0, i, HEIGHT);
+    }
+    for (int i = 0; i < HEIGHT; i += 50) {
+        line(0, i, WIDTH, i);
+    }
+
+    // 绘制障碍物
+    for (auto& obs : obstacles) {
+        if (!obs.active) continue;
+
+        int red = 150 + (obs.speed * 5);
+        if (red > 255) red = 255;
+        setfillcolor(RGB(red, 30, 30));
+        solidrectangle(obs.x, obs.y, obs.x + obs.size, obs.y + obs.size);
+
+        setlinecolor(RGB(255, 100, 100));
+        line(obs.x, obs.y, obs.x + obs.size, obs.y + obs.size);
+        line(obs.x + obs.size, obs.y, obs.x, obs.y + obs.size);
+    }
+
+    // 绘制道具
+    for (auto& pu : powerUps) {
+        if (!pu.active) continue;
+
+        if (pu.type == POWERUP_SHIELD) {
+            setfillcolor(BLUE);
+            solidcircle(pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2, POWERUP_SIZE / 2);
+            setlinecolor(WHITE);
+            circle(pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2, POWERUP_SIZE / 3);
+        }
+        else {
+            setfillcolor(GREEN);
+            solidcircle(pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2, POWERUP_SIZE / 2);
+            setlinecolor(WHITE);
+            line(pu.x + POWERUP_SIZE / 2 - 8, pu.y + POWERUP_SIZE / 2,
+                pu.x + POWERUP_SIZE / 2 + 8, pu.y + POWERUP_SIZE / 2);
+            line(pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2 - 8,
+                pu.x + POWERUP_SIZE / 2, pu.y + POWERUP_SIZE / 2 + 8);
+        }
+    }
+
+    // 绘制玩家
+    if (p.hasShield) {
+        setlinecolor(BLUE);
+        for (int i = 0; i < 3; i++) {
+            circle(p.x + PLAYER_SIZE / 2, p.y + PLAYER_SIZE / 2,
+                PLAYER_SIZE / 2 + 5 + i * 3);
+        }
+    }
+
+    int healthColor = RGB(255 - p.health, p.health, 0);
+    setlinecolor(healthColor);
+    circle(p.x + PLAYER_SIZE / 2, p.y + PLAYER_SIZE / 2, PLAYER_SIZE / 2 + 2);
+
+    setfillcolor(WHITE);
+    solidcircle(p.x + PLAYER_SIZE / 2, p.y + PLAYER_SIZE / 2, PLAYER_SIZE / 2);
+
+    setfillcolor(BLACK);
+    solidcircle(p.x + PLAYER_SIZE / 3, p.y + PLAYER_SIZE / 3, 4);
+    solidcircle(p.x + 2 * PLAYER_SIZE / 3, p.y + PLAYER_SIZE / 3, 4);
+
+    // 显示游戏信息（全中文）
+    settextcolor(WHITE);
+    setbkmode(TRANSPARENT);
+    settextstyle(24, 0, L"微软雅黑");
+
+    wchar_t infoStr[100];
+    swprintf(infoStr, 100, L"第 %d 关 / 5  |  得分: %d  |  生命: %d%%  |  倒计时: %d秒",
+        level, score, p.health, timeLeft);
+    outtextxy(20, 20, infoStr);
+
+    settextcolor(RGB(255, 200, 100));
+    outtextxy(20, 60, levelDescriptions[level - 1]);
+
+    settextcolor(WHITE);
+    wchar_t obsStr[100];
+    swprintf(obsStr, 100, L"当前障碍: %d / %d  |  速度: %d",
+        (int)obstacles.size(), cfg.maxObstacles, cfg.baseSpeed);
+    outtextxy(20, 90, obsStr);
+
+    // 生命条
+    setlinecolor(WHITE);
+    rectangle(20, 120, 320, 140);
+    if (p.health > 60) setfillcolor(GREEN);
+    else if (p.health > 30) setfillcolor(YELLOW);
+    else setfillcolor(RED);
+    solidrectangle(21, 121, 21 + (p.health * 3), 139);
+
+    if (p.hasShield) {
+        settextcolor(BLUE);
+        wchar_t shieldStr[50];
+        swprintf(shieldStr, 50, L"护盾: %d秒", p.shieldTimer / 60);
+        outtextxy(340, 120, shieldStr);
+    }
+
+    // 右侧操作提示
+    settextcolor(RGB(200, 200, 200));
+    settextstyle(24, 0, L"微软雅黑");
+    outtextxy(WIDTH - 280, 20, L"操作说明");
+
+    settextstyle(20, 0, L"微软雅黑");
+    outtextxy(WIDTH - 280, 60, L"W  ↑");
+    outtextxy(WIDTH - 280, 90, L"S  ↓");
+    outtextxy(WIDTH - 280, 120, L"A  ←");
+    outtextxy(WIDTH - 280, 150, L"D  →");
+
+    if (level >= 3) {
+        settextcolor(RGB(100, 200, 255));
+        outtextxy(WIDTH - 280, 200, L"蓝色：护盾");
+        settextcolor(RGB(100, 255, 100));
+        outtextxy(WIDTH - 280, 230, L"绿色：血包");
+    }
+
+    // 底部提示
+    settextcolor(RGB(150, 150, 150));
+    settextstyle(18, 0, L"微软雅黑");
+    outtextxy(20, HEIGHT - 30, L"红色障碍碰触扣15生命 | 鼠标右键退出游戏");
+
+    EndBatchDraw();
+}
+
+// 显示关卡开始画面 - 终极版（鼠标点击开始）
+void showLevelStart(int level) {
+    cleardevice();
+    setbkcolor(BLACK);
+    cleardevice();
+
+    settextcolor(RGB(255, 215, 0));
+    settextstyle(56, 0, L"微软雅黑");
+    wchar_t levelStr[50];
+    swprintf(levelStr, 50, L"第 %d 关", level);
+
+    int textWidth = textwidth(levelStr);
+    outtextxy((WIDTH - textWidth) / 2, HEIGHT / 2 - 100, levelStr);
+
+    settextstyle(36, 0, L"微软雅黑");
+    settextcolor(RGB(200, 200, 255));
+
+    textWidth = textwidth(levelDescriptions[level - 1]);
+    outtextxy((WIDTH - textWidth) / 2, HEIGHT / 2, levelDescriptions[level - 1]);
+
+    settextstyle(28, 0, L"微软雅黑");
+    settextcolor(WHITE);
+
+    LevelConfig& cfg = levels[level - 1];
+    wchar_t detailStr[200];
+    swprintf(detailStr, 200, L"速度: %d  最大数量: %d  障碍大小: %dpx",
+        cfg.baseSpeed, cfg.maxObstacles, cfg.obstacleSize);
+
+    textWidth = textwidth(detailStr);
+    outtextxy((WIDTH - textWidth) / 2, HEIGHT / 2 + 60, detailStr);
+
+    if (cfg.allowPowerUps) {
+        settextcolor(GREEN);
+        wchar_t powerUpStr[] = L"本关出现道具！";
+        textWidth = textwidth(powerUpStr);
+        outtextxy((WIDTH - textWidth) / 2, HEIGHT / 2 + 100, powerUpStr);
+    }
+
+    settextcolor(RGB(150, 150, 150));
+    wchar_t tipStr[] = L"点击鼠标左键开始 | 右键退出";
+    textWidth = textwidth(tipStr);
+    outtextxy((WIDTH - textWidth) / 2, HEIGHT / 2 + 160, tipStr);
+
+    FlushBatchDraw();
+
+    // 等待鼠标点击
+    MOUSEMSG msg;
+    while (true) {
+        msg = GetMouseMsg();
+        if (msg.uMsg == WM_LBUTTONDOWN) {
+            break;
+        }
+        if (msg.uMsg == WM_RBUTTONDOWN) {  // 右键退出
+            closegraph();
+            exit(0);
+        }
+    }
+}
+
+// 显示通关画面
+void showLevelComplete(int level, int score) {
+    cleardevice();
+
+    settextcolor(GREEN);
+    settextstyle(56, 0, L"微软雅黑");
+    outtextxy((WIDTH - textwidth(L"关卡通过！")) / 2, HEIGHT / 2 - 100, L"关卡通过！");
+
+    settextstyle(32, 0, L"微软雅黑");
+    settextcolor(YELLOW);
+    wchar_t scoreStr[100];
+    swprintf(scoreStr, 100, L"当前得分: %d", score);
+    outtextxy((WIDTH - textwidth(scoreStr)) / 2, HEIGHT / 2, scoreStr);
+
+    if (level < 5) {
+        settextstyle(28, 0, L"微软雅黑");
+        settextcolor(WHITE);
+        wchar_t nextStr[100];
+        swprintf(nextStr, 100, L"即将进入第 %d 关...", level + 1);
+        outtextxy((WIDTH - textwidth(nextStr)) / 2, HEIGHT / 2 + 60, nextStr);
+    }
+
+    settextcolor(RGB(150, 150, 150));
+    wchar_t tipStr[] = L"点击鼠标左键继续";
+    outtextxy((WIDTH - textwidth(tipStr)) / 2, HEIGHT / 2 + 120, tipStr);
+
+    FlushBatchDraw();
+
+    // 等待鼠标点击
+    MOUSEMSG msg;
+    while (true) {
+        msg = GetMouseMsg();
+        if (msg.uMsg == WM_LBUTTONDOWN) {
+            break;
+        }
+    }
+}
+
+// 显示游戏结束画面
+void showGameOver(int score, int level) {
+    cleardevice();
+
+    settextcolor(RED);
+    settextstyle(56, 0, L"微软雅黑");
+    outtextxy((WIDTH - textwidth(L"游戏失败")) / 2, HEIGHT / 2 - 100, L"游戏失败");
+
+    settextstyle(36, 0, L"微软雅黑");
+    settextcolor(YELLOW);
+    wchar_t scoreStr[100];
+    swprintf(scoreStr, 100, L"最终得分: %d", score);
+    outtextxy((WIDTH - textwidth(scoreStr)) / 2, HEIGHT / 2 - 30, scoreStr);
+
+    settextcolor(WHITE);
+    wchar_t levelStr[100];
+    swprintf(levelStr, 100, L"止步于: 第 %d 关", level);
+    outtextxy((WIDTH - textwidth(levelStr)) / 2, HEIGHT / 2 + 30, levelStr);
+
+    settextcolor(RGB(150, 150, 150));
+    wchar_t tipStr[] = L"点击鼠标左键退出";
+    outtextxy((WIDTH - textwidth(tipStr)) / 2, HEIGHT / 2 + 100, tipStr);
+
+    FlushBatchDraw();
+
+    // 等待鼠标点击
+    MOUSEMSG msg;
+    while (true) {
+        msg = GetMouseMsg();
+        if (msg.uMsg == WM_LBUTTONDOWN) {
+            break;
+        }
+    }
+}
+
+// 显示通关结局
+void showGameComplete(int score) {
+    cleardevice();
+
+    settextcolor(RGB(255, 215, 0));
+    settextstyle(64, 0, L"微软雅黑");
+    outtextxy((WIDTH - textwidth(L"恭喜通关！")) / 2, HEIGHT / 2 - 120, L"恭喜通关！");
+
+    settextstyle(48, 0, L"微软雅黑");
+    settextcolor(YELLOW);
+    wchar_t scoreStr[100];
+    swprintf(scoreStr, 100, L"最终得分: %d", score);
+    outtextxy((WIDTH - textwidth(scoreStr)) / 2, HEIGHT / 2, scoreStr);
+
+    settextstyle(32, 0, L"微软雅黑");
+    settextcolor(WHITE);
+    outtextxy((WIDTH - textwidth(L"你战胜了所有关卡！")) / 2, HEIGHT / 2 + 80, L"你战胜了所有关卡！");
+
+    wchar_t tipStr[] = L"点击鼠标左键退出";
+    outtextxy((WIDTH - textwidth(tipStr)) / 2, HEIGHT / 2 + 130, tipStr);
+
+    FlushBatchDraw();
+
+    // 等待鼠标点击
+    MOUSEMSG msg;
+    while (true) {
+        msg = GetMouseMsg();
+        if (msg.uMsg == WM_LBUTTONDOWN) {
+            break;
+        }
+    }
+}
+
+// ==================== 主函数 ====================
+int main() {
+    // 初始化图形窗口
+    initgraph(WIDTH, HEIGHT);
+    SetWindowText(GetHWnd(), L"地狱挑战 - 五关生死劫");
+
+    setbkcolor(BLACK);
+    cleardevice();
+    srand((unsigned)time(NULL));
+
+    int totalScore = 0;
+    bool gameComplete = false;
+
+    // 尝试播放音乐（忽略错误）
+    mciSendString(L"open \"level1.wav\" type mpegvideo alias bgm", NULL, 0, NULL);
+    mciSendString(L"play bgm repeat", NULL, 0, NULL);
+
+    // 五关循环
+    for (int level = 1; level <= 5; level++) {
+        // 显示关卡开始画面
+        showLevelStart(level);
+
+        // 获取当前关卡配置
+        LevelConfig& cfg = levels[level - 1];
+
+        // 初始化关卡
+        Player player = initPlayer();
+        std::list<Obstacle> obstacles;
+        std::list<PowerUp> powerUps;
+
+        int frameCount = 0;
+        int timeLeft = 30;
+        clock_t lastTime = clock();
+        int spawnCounter = 0;
+
+        // 初始生成障碍物（大幅提升开局密度）
+        for (int i = 0; i < 20; i++) {
+            obstacles.push_back(createObstacle(cfg.baseSpeed, cfg.obstacleSize));
+        }
+
+        // 关卡主循环
+        while (player.health > 0 && timeLeft > 0) {
+            // 新增：空格键暂停/恢复检测
+            if (GetAsyncKeyState(VK_SPACE) & 0x8000) {
+                // 防止重复触发，短暂延迟
+                Sleep(200);
+                isPaused = !isPaused;
+
+                // 暂停时显示提示
+                if (isPaused) {
+                    cleardevice();
+                    settextcolor(YELLOW);
+                    settextstyle(64, 0, L"微软雅黑");
+                    outtextxy((WIDTH - textwidth(L"游戏暂停")) / 2, HEIGHT / 2 - 50, L"游戏暂停");
+                    settextcolor(WHITE);
+                    settextstyle(24, 0, L"微软雅黑");
+                    outtextxy((WIDTH - textwidth(L"再次按空格键恢复")) / 2, HEIGHT / 2 + 50, L"再次按空格键恢复");
+                    FlushBatchDraw();
+                }
+            }
+
+            // 新增：暂停状态下跳过所有逻辑更新
+            if (isPaused) {
+                Sleep(50); // 降低暂停时的CPU占用
+                continue;
+            }
+
+            frameCount++;
+            spawnCounter++;
+
+            // 计时
+            clock_t currentTime = clock();
+            if (currentTime - lastTime >= CLOCKS_PER_SEC) {
+                timeLeft--;
+                lastTime = currentTime;
+            }
+            // ... 后续逻辑不变
+
+            // 护盾计时
+            if (player.hasShield) {
+                player.shieldTimer--;
+                if (player.shieldTimer <= 0) {
+                    player.hasShield = false;
+                }
+            }
+
+            // WASD控制
+            player.isMovingUp = (GetAsyncKeyState('W') & 0x8000) != 0;
+            player.isMovingDown = (GetAsyncKeyState('S') & 0x8000) != 0;
+            player.isMovingLeft = (GetAsyncKeyState('A') & 0x8000) != 0;
+            player.isMovingRight = (GetAsyncKeyState('D') & 0x8000) != 0;
+
+            // 更新玩家位置
+            if (player.isMovingLeft) {
+                player.x -= MOVE_SPEED;
+                if (player.x < 0) player.x = 0;
+            }
+            if (player.isMovingRight) {
+                player.x += MOVE_SPEED;
+                if (player.x > WIDTH - PLAYER_SIZE) player.x = WIDTH - PLAYER_SIZE;
+            }
+            if (player.isMovingUp) {
+                player.y -= RISE_SPEED;
+                if (player.y < 0) player.y = 0;
+            }
+            if (player.isMovingDown) {
+                player.y += FALL_SPEED;
+                if (player.y > HEIGHT - PLAYER_SIZE - 20)
+                    player.y = HEIGHT - PLAYER_SIZE - 20;
+            }
+
+            // 自动下落
+            if (!player.isMovingUp && !player.isMovingDown) {
+                if (player.y < HEIGHT - PLAYER_SIZE - 20) {
+                    player.y += FALL_SPEED / 2;
+                }
+            }
+
+            // 生成新障碍物
+            if (obstacles.size() < cfg.maxObstacles && spawnCounter >= cfg.spawnRate) {
+                obstacles.push_back(createObstacle(cfg.baseSpeed, cfg.obstacleSize));
+                spawnCounter = 0;
+            }
+
+            // 生成道具
+            if (cfg.allowPowerUps && powerUps.size() < 2) {
+                if (rand() % 100 < cfg.powerUpChance) {
+                    PowerUpType type = (rand() % 2 == 0) ? POWERUP_SHIELD : POWERUP_HEALTH;
+                    powerUps.push_back(createPowerUp(cfg.baseSpeed, type));
+                }
+            }
+
+            // 更新障碍物
+            for (auto it = obstacles.begin(); it != obstacles.end();) {
+                if (!it->active) {
+                    it = obstacles.erase(it);
+                    continue;
+                }
+
+                it->y += it->speed;
+
+                // 碰撞检测
+                if (player.x < it->x + it->size &&
+                    player.x + PLAYER_SIZE > it->x &&
+                    player.y < it->y + it->size &&
+                    player.y + PLAYER_SIZE > it->y) {
+
+                    if (!player.hasShield) {
+                        player.health -= 15;
+                    }
+                    it->active = false;
+                    totalScore += 5;
+                }
+
+                if (it->y > HEIGHT) {
+                    it->active = false;
+                }
+
+                ++it;
+            }
+
+            // 更新道具
+            for (auto it = powerUps.begin(); it != powerUps.end();) {
+                if (!it->active) {
+                    it = powerUps.erase(it);
+                    continue;
+                }
+
+                it->y += it->speed;
+
+                if (player.x < it->x + POWERUP_SIZE &&
+                    player.x + PLAYER_SIZE > it->x &&
+                    player.y < it->y + POWERUP_SIZE &&
+                    player.y + PLAYER_SIZE > it->y) {
+
+                    if (it->type == POWERUP_SHIELD) {
+                        player.hasShield = true;
+                        player.shieldTimer = 180;  // 3秒
+                    }
+                    else {
+                        player.health += 20;
+                        if (player.health > 100) player.health = 100;
+                    }
+
+                    it->active = false;
+                    totalScore += 10;
+                }
+
+                if (it->y > HEIGHT) {
+                    it->active = false;
+                }
+
+                ++it;
+            }
+
+            // 绘制画面
+            drawGame(player, obstacles, powerUps, totalScore,
+                level, timeLeft, frameCount, cfg);
+
+            // 延迟（60fps）
+            Sleep(16);
+
+            // 鼠标右键退出检测
+            if (MouseHit()) {
+                MOUSEMSG msg = GetMouseMsg();
+                if (msg.uMsg == WM_RBUTTONDOWN) {
+                    mciSendString(L"close all", NULL, 0, NULL);
+                    closegraph();
+                    return 0;
+                }
+            }
+        }
+
+        // 关卡结束判定
+        if (player.health <= 0) {
+            showGameOver(totalScore, level);
+            gameComplete = true;
+            break;
+        }
+        else if (timeLeft <= 0 && level < 5) {
+            showLevelComplete(level, totalScore);
+        }
+    }
+
+    // 通关结局
+    if (!gameComplete) {
+        showGameComplete(totalScore);
+    }
+
+    // 清理
+    mciSendString(L"close all", NULL, 0, NULL);
+    closegraph();
+    return 0;
+}
