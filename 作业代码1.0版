@@ -1,0 +1,262 @@
+#include <graphics.h>
+#include <conio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <string>
+
+// 定义常量 - 大幅增大画面尺寸
+const int WIDTH = 1200;        // 从800增加到1200
+const int HEIGHT = 800;         // 从600增加到800
+const int PLAYER_SIZE = 60;     // 玩家稍微增大到60
+const int OBSTACLE_WIDTH = 35;  // 障碍物稍微减小到35，增加难度
+const int OBSTACLE_HEIGHT = 35;
+
+// 移动速度 - 按比例调整
+const int MOVE_SPEED = 35;      // 基础移动速度
+const int RISE_SPEED = 18;      // 上升速度
+const int FALL_SPEED = 12;      // 下落速度
+const int BASE_OBSTACLE_SPEED = 10;  // 基础障碍物速度
+
+// 定义结构体
+struct Player {
+    int x, y;
+    bool isMovingUp;
+    bool isMovingLeft;
+    bool isMovingRight;
+};
+
+struct Obstacle {
+    int x, y;
+    int speed;  // 每个障碍物可以有自己的速度
+};
+
+// 初始化玩家
+Player initPlayer() {
+    Player p;
+    p.x = WIDTH / 2 - PLAYER_SIZE / 2;
+    p.y = HEIGHT - PLAYER_SIZE - 20;  // 底部留更多空间
+    p.isMovingUp = false;
+    p.isMovingLeft = false;
+    p.isMovingRight = false;
+    return p;
+}
+
+// 初始化障碍物 - 增加随机速度
+Obstacle initObstacle(int baseSpeed) {
+    Obstacle o;
+    o.x = rand() % (WIDTH - OBSTACLE_WIDTH);
+    o.y = -OBSTACLE_HEIGHT - rand() % 100;  // 随机起始高度
+    // 速度在基础速度上下浮动
+    o.speed = baseSpeed + (rand() % 5 - 2);  // -2到+2的随机变化
+    if (o.speed < 3) o.speed = 3;  // 最小速度限制
+    return o;
+}
+
+// 绘制玩家
+void drawPlayer(Player& p) {
+    setfillcolor(WHITE);
+    // 给玩家加个发光效果
+    setlinecolor(YELLOW);
+    circle(p.x + PLAYER_SIZE / 2, p.y + PLAYER_SIZE / 2, PLAYER_SIZE / 2 + 2);
+    solidcircle(p.x + PLAYER_SIZE / 2, p.y + PLAYER_SIZE / 2, PLAYER_SIZE / 2);
+}
+
+// 绘制障碍物
+void drawObstacle(Obstacle& o, int frameCount) {
+    // 让障碍物有点闪烁效果
+    if (frameCount % 10 < 5) {
+        setfillcolor(RED);
+    }
+    else {
+        setfillcolor(LIGHTRED);
+    }
+    solidrectangle(o.x, o.y, o.x + OBSTACLE_WIDTH, o.y + OBSTACLE_HEIGHT);
+
+    // 加个边框
+    setlinecolor(YELLOW);
+    rectangle(o.x, o.y, o.x + OBSTACLE_WIDTH, o.y + OBSTACLE_HEIGHT);
+}
+
+// 更新玩家位置
+void updatePlayer(Player& p) {
+    // 左右移动
+    if (p.isMovingLeft) {
+        p.x -= MOVE_SPEED;
+        if (p.x < 0) p.x = 0;
+    }
+    if (p.isMovingRight) {
+        p.x += MOVE_SPEED;
+        if (p.x > WIDTH - PLAYER_SIZE) p.x = WIDTH - PLAYER_SIZE;
+    }
+
+    // 上下移动
+    if (p.isMovingUp) {
+        p.y -= RISE_SPEED;
+        if (p.y < 0) p.y = 0;
+    }
+    else {
+        if (p.y < HEIGHT - PLAYER_SIZE - 20) {
+            p.y += FALL_SPEED;
+        }
+    }
+}
+
+// 更新障碍物位置
+void updateObstacle(Obstacle& o) {
+    o.y += o.speed;
+}
+
+// 检测碰撞
+bool checkCollision(Player& p, Obstacle& o) {
+    return (p.x < o.x + OBSTACLE_WIDTH && p.x + PLAYER_SIZE > o.x &&
+        p.y < o.y + OBSTACLE_HEIGHT && p.y + PLAYER_SIZE > o.y);
+}
+
+int main() {
+    // 初始化图形窗口 - 更大的画面
+    initgraph(WIDTH, HEIGHT);
+
+    // 设置窗口标题
+    SetWindowText(GetHWnd(), _T("极速接物 - 大画面版"));
+
+    // 设置随机种子
+    srand((unsigned)time(NULL));
+
+    // 初始化玩家和障碍物
+    Player player = initPlayer();
+    Obstacle obstacle = initObstacle(BASE_OBSTACLE_SPEED);
+
+    // 游戏变量
+    int score = 0;
+    int missed = 0;
+    const int MAX_MISSED = 8;      // 增加容错
+    int currentBaseSpeed = BASE_OBSTACLE_SPEED;
+    int frameCount = 0;            // 用于动画效果
+
+    // 设置文本样式
+    settextcolor(WHITE);
+    setbkmode(TRANSPARENT);
+    settextstyle(24, 0, _T("微软雅黑"));  // 更大的字体
+
+    while (true) {
+        frameCount++;
+
+        // 处理键盘输入
+        if (GetAsyncKeyState('A') & 0x8000) {
+            player.isMovingLeft = true;
+        }
+        else {
+            player.isMovingLeft = false;
+        }
+
+        if (GetAsyncKeyState('D') & 0x8000) {
+            player.isMovingRight = true;
+        }
+        else {
+            player.isMovingRight = false;
+        }
+
+        // 处理鼠标输入
+        if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) {
+            player.isMovingUp = true;
+        }
+        else {
+            player.isMovingUp = false;
+        }
+
+        // 更新玩家位置
+        updatePlayer(player);
+
+        // 更新障碍物位置
+        updateObstacle(obstacle);
+
+        // 检测碰撞
+        if (checkCollision(player, obstacle)) {
+            score += 10;
+            // 连击奖励
+            if (frameCount % 30 == 0) {
+                score += 5;  // 每30帧接住一个额外奖励
+            }
+            obstacle = initObstacle(currentBaseSpeed);
+            if (score % 80 == 0) {
+                currentBaseSpeed += 1;
+                if (currentBaseSpeed > 25) currentBaseSpeed = 25;
+            }
+        }
+
+        // 障碍物超出屏幕
+        if (obstacle.y > HEIGHT) {
+            missed++;
+            if (missed >= MAX_MISSED) {
+                break;
+            }
+            obstacle = initObstacle(currentBaseSpeed);
+        }
+
+        // 绘制背景 - 渐变效果
+        cleardevice();
+
+        // 绘制网格背景
+        setlinecolor(DARKGRAY);
+        for (int i = 0; i < WIDTH; i += 50) {
+            line(i, 0, i, HEIGHT);
+        }
+        for (int i = 0; i < HEIGHT; i += 50) {
+            line(0, i, WIDTH, i);
+        }
+
+        // 绘制玩家
+        drawPlayer(player);
+
+        // 绘制障碍物
+        drawObstacle(obstacle, frameCount);
+
+        // 显示游戏信息
+        std::string infoStr = "得分: " + std::to_string(score) +
+            "  错过: " + std::to_string(missed) +
+            "/" + std::to_string(MAX_MISSED) +
+            "  速度: " + std::to_string(currentBaseSpeed) +
+            "  当前方块速度: " + std::to_string(obstacle.speed);
+        std::wstring wInfoStr(infoStr.begin(), infoStr.end());
+        outtextxy(20, 20, wInfoStr.c_str());
+
+        // 显示操作提示
+        settextstyle(20, 0, _T("微软雅黑"));
+        outtextxy(20, HEIGHT - 70, _T("A/D: 左右移动 (超快速度)"));
+        outtextxy(20, HEIGHT - 45, _T("鼠标左键: 上升"));
+        outtextxy(20, HEIGHT - 20, _T("屏幕尺寸: 1200x800"));
+
+        // 延迟 - 更流畅
+        Sleep(16);  // 约60fps
+    }
+
+    // 游戏结束画面
+    cleardevice();
+
+    settextstyle(56, 0, _T("微软雅黑"));
+    settextcolor(RED);
+    outtextxy(WIDTH / 2 - 200, HEIGHT / 2 - 150, _T("GAME OVER"));
+
+    settextstyle(36, 0, _T("微软雅黑"));
+    settextcolor(YELLOW);
+    std::string finalScoreStr = "最终得分: " + std::to_string(score);
+    std::wstring wFinalScoreStr(finalScoreStr.begin(), finalScoreStr.end());
+    outtextxy(WIDTH / 2 - 120, HEIGHT / 2 - 50, wFinalScoreStr.c_str());
+
+    settextstyle(28, 0, _T("微软雅黑"));
+    settextcolor(WHITE);
+    std::string missedStr = "错过次数: " + std::to_string(missed) + "/" + std::to_string(MAX_MISSED);
+    std::wstring wMissedStr(missedStr.begin(), missedStr.end());
+    outtextxy(WIDTH / 2 - 100, HEIGHT / 2, wMissedStr.c_str());
+
+    std::string speedStr = "最高速度: " + std::to_string(currentBaseSpeed);
+    std::wstring wSpeedStr(speedStr.begin(), speedStr.end());
+    outtextxy(WIDTH / 2 - 80, HEIGHT / 2 + 40, wSpeedStr.c_str());
+
+    settextstyle(24, 0, _T("微软雅黑"));
+    outtextxy(WIDTH / 2 - 140, HEIGHT / 2 + 90, _T("按任意键退出游戏"));
+
+    _getch();
+    closegraph();
+    return 0;
+}
